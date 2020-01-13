@@ -1,0 +1,33 @@
+autodataman initrepo <local repo dir>
+Initialize a local repository directory.
+
+autodataman setrepo <local repo dir>
+Set the default local repository directory.
+
+autodataman getrepo
+Get the current default local repository directory.
+
+autodataman setserver <server>
+Set the default data server URL.
+
+autodataman getserver
+Get the default data server URL.
+
+autodataman avail [-s <server>]
+List datasets available on a remote data server.
+
+autodataman list [-l <local repo dir>]
+List datasets available on the local data server.
+
+autodataman validate [-l <local repo dir>]
+Validate the datasets on the local repo.
+
+autodataman remove [-f] [-l <local repo dir>] [-s <server>] <dataset id>[/version]
+Remove a dataset from the local data server.
+
+autodataman get [-l <local repo dir>]  [-s <server>] <dataset id>[/<version>]
+Get the specified dataset from the remote data server and store it on the local data repo or remote server.
+
+autodataman put [-l <local repo dir>] [-s <server>] [-c <compression type>] [-v <version>] <dataset dir>
+Put the specified dataset into the local repository or remote server.
+
