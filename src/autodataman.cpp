@@ -29,6 +29,27 @@
 #include "Repository.h"
 #include "Namelist.h"
 
+///////////////////////////////////////////////////////////////////////////////
+
+static size_t write_data_to_stringstream(
+	void * ptr,
+	size_t size,
+	size_t nmemb,
+	void * stream
+) {
+	char * sz = new char[size*nmemb+1];
+	if (sz == 0) {
+		return 0;
+	}
+	sz[size*nmemb] = '\0';
+	memcpy(sz, (char*)ptr, size*nmemb);
+	std::stringstream & str = *((std::stringstream*)stream);
+	str << sz;
+	delete[] sz;
+	return size*nmemb;
+}
+
+///////////////////////////////////////////////////////////////////////////////
 /*
 static size_t write_data(void *ptr, size_t size, size_t nmemb, void *stream)
 {
@@ -36,7 +57,6 @@ static size_t write_data(void *ptr, size_t size, size_t nmemb, void *stream)
 	return written;
 }
 */
-
 ///////////////////////////////////////////////////////////////////////////////
 
 class AutodatamanNamelist : public Namelist {
@@ -164,9 +184,9 @@ int adm_setrepo(
 	}
 
 	// Verify directory is a valid repository
-	filesystem::path pathRepoMeta = pathRepo/filesystem::path("repo.json");
+	filesystem::path pathRepoMeta = pathRepo/filesystem::path("repo.txt");
 	if (!pathRepoMeta.exists()) {
-		printf("ERROR \"%s\" is not a valid autodataman repo: Missing \"repo.json\" file\n",
+		printf("ERROR \"%s\" is not a valid autodataman repo: Missing \"repo.txt\" file\n",
 			pathRepo.str().c_str());
 		return 1;
 	}
@@ -186,16 +206,30 @@ int adm_setrepo(
 }
 
 ///////////////////////////////////////////////////////////////////////////////
- 
-int adm_getrepo() {
 
+int adm_getrepo_string(
+	std::string & str
+) {
 	// Load .autodataman
 	AutodatamanNamelist nml;
 	int iStatus = nml.LoadFromUser();
 	if (iStatus) return iStatus;
 
+	str = nml["default_local_repo"];
+
+	return 0;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+ 
+int adm_getrepo() {
+
 	// Report the name of the repository in .autodataman
-	printf("Default autodataman repo set to \"%s\"\n", nml["default_local_repo"].c_str());
+	std::string strRepo;
+	int iStatus = adm_getrepo_string(strRepo);
+	if (iStatus) return iStatus;
+
+	printf("Default autodataman repo set to \"%s\"\n", strRepo.c_str());
 
 	return 0;
 }
@@ -203,13 +237,104 @@ int adm_getrepo() {
 ///////////////////////////////////////////////////////////////////////////////
  
 int adm_setserver(
-	const std::string & strDir
+	const std::string & strServer
 ) {
+	// Repo metadata
+	std::string strServerMetadata = strServer;
+	if (strServer[strServer.length()-1] == '/') {
+		strServerMetadata += "repo.txt";
+	} else {
+		strServerMetadata += "/repo.txt";
+	}
+
+	// Notify user
+	printf("Attempting to download server metadata file \"%s\"\n",
+		strServerMetadata.c_str());
+
 	// Verify server exists
+	CURL *curl_handle;
+ 
+	curl_global_init(CURL_GLOBAL_ALL);
+ 
+	// init the curl session
+	curl_handle = curl_easy_init();
+ 
+	// set URL to get here
+	curl_easy_setopt(curl_handle, CURLOPT_URL, strServerMetadata.c_str());
+ 
+	// Switch on full protocol/debug output while testing
+	curl_easy_setopt(curl_handle, CURLOPT_VERBOSE, 0L);
+ 
+	// disable progress meter, set to 0L to enable it
+	curl_easy_setopt(curl_handle, CURLOPT_NOPROGRESS, 1L);
+ 
+	// send all data to this function
+	curl_easy_setopt(curl_handle, CURLOPT_WRITEFUNCTION, write_data_to_stringstream);
+ 
+	// open the file
+	std::stringstream strFile;
+ 
+	// write the page body to this string stream
+	curl_easy_setopt(curl_handle, CURLOPT_WRITEDATA, (void*)(&strFile));
+ 
+	// get it!
+	curl_easy_perform(curl_handle);
+ 
+	// cleanup curl stuff
+	curl_easy_cleanup(curl_handle);
+ 
+	curl_global_cleanup();
+
+	printf("Download completed.  Parsing metadata file.\n");
+
+	std::cout << "=============================================" << std::endl;
+	std::cout << strFile.str() << std::endl;
+	std::cout << "=============================================" << std::endl;
 
 	// Verify server is a valid repository
+	try {
+		nlohmann::json::parse(strFile.str());
+	} catch (nlohmann::json::parse_error& e)
+    {
+		std::cout << "ERROR parsing server repo metadata" << std::endl;
+        std::cout << "  message: " << e.what() << '\n'
+                  << "  exception id: " << e.id << '\n'
+                  << "  byte position of error: " << e.byte << std::endl;
+
+		std::cout << "FAILED to set default server" << std::endl;
+		return 1;
+    }
+
+	printf("Parsing complete.  Validating server contents.\n");
+
+	printf("WARNING: Validation not implemented...\n");
 
 	// Set this server to be default in .autodataman
+	AutodatamanNamelist nml;
+	int iStatus = nml.LoadFromUser();
+	if (iStatus) return iStatus;
+
+	nml["default_server"] = strServer;
+
+	iStatus = nml.SaveToUser();
+	if (iStatus) return iStatus;
+
+	printf("SUCCESSFULLY set autodataman server to \"%s\"\n", strServer.c_str());
+
+	return 0;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+int adm_getserver_string(
+	std::string & str
+) {
+	// Load .autodataman
+	AutodatamanNamelist nml;
+	int iStatus = nml.LoadFromUser();
+	if (iStatus) return iStatus;
+
+	str = nml["default_server"];
 
 	return 0;
 }
@@ -217,9 +342,17 @@ int adm_setserver(
 ///////////////////////////////////////////////////////////////////////////////
  
 int adm_getserver() {
-	// Load .autodataman
 
 	// Report the name of the repository in .autodataman
+	std::string strServer;
+	int iStatus = adm_getserver_string(strServer);
+	if (iStatus) return iStatus;
+
+	if (strServer == "") {
+		printf("No default autodataman server\n");
+	} else {
+		printf("Default autodataman server set to \"%s\"\n", strServer.c_str());
+	}
 
 	return 0;
 }
