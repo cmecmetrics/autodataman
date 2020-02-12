@@ -1,3 +1,6 @@
+The autodataman tool is intended to be a very lightweight climate data database and data
+distribution engine.  The following command line options are available as part of the tool.
+
 autodataman initrepo <local repo dir>
 Initialize a local repository directory.
 
@@ -14,9 +17,12 @@ autodataman getserver
 Get the default data server URL.
 
 autodataman avail [-s <server>]
-List datasets available on a remote data server.
+List datasets available on the given remote server.
 
-autodataman list [-l <local repo dir>]
+autodataman info [-l <local repo dir>] [-s <server>] <dataset id>
+Give detailed information on the given dataset id.
+
+autodataman list [<local repo dir>]
 List datasets available on the local data server.
 
 autodataman validate [-l <local repo dir>]
@@ -28,6 +34,6 @@ Remove a dataset from the local data server.
 autodataman get [-l <local repo dir>]  [-s <server>] <dataset id>[/<version>]
 Get the specified dataset from the remote data server and store it on the local data repo or remote server.
 
-autodataman put [-l <local repo dir>] [-s <server>] [-c <compression type>] [-v <version>] <dataset dir>
+autodataman put [-l <local repo dir>] [-s <server>] [-c <compression type>] <dataset dir>/<version>
 Put the specified dataset into the local repository or remote server.
 
