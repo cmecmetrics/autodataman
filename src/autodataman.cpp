@@ -17,7 +17,8 @@
 #include <unistd.h>
 #include <pwd.h>
  
-#include <curl/curl.h>
+#include "admcurl.h"
+#include "admmetadata.h"
 
 #include <string>
 #include <vector>
@@ -109,380 +110,6 @@ std::string ParseCommandLine(
 
 	return std::string("");
 }
-
-///////////////////////////////////////////////////////////////////////////////
-
-static size_t write_data_to_stringstream(
-	void * ptr,
-	size_t size,
-	size_t nmemb,
-	void * stream
-) {
-	char * sz = new char[size*nmemb+1];
-	if (sz == 0) {
-		return 0;
-	}
-	sz[size*nmemb] = '\0';
-	memcpy(sz, (char*)ptr, size*nmemb);
-	std::stringstream & str = *((std::stringstream*)stream);
-	str << sz;
-	delete[] sz;
-	return size*nmemb;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-/*
-static size_t write_data(void *ptr, size_t size, size_t nmemb, void *stream)
-{
-	size_t written = fwrite(ptr, size, nmemb, (FILE *)stream);
-	return written;
-}
-*/
-
-///////////////////////////////////////////////////////////////////////////////
-
-int curl_download_to_stringstream(
-	const std::string & strURL,
-	std::stringstream & strFile
-) {
-	// Verify server exists
-	CURL *curl_handle;
- 
-	curl_global_init(CURL_GLOBAL_ALL);
- 
-	// init the curl session
-	curl_handle = curl_easy_init();
- 
-	// set URL to get here
-	curl_easy_setopt(curl_handle, CURLOPT_URL, strURL.c_str());
- 
-	// Switch on full protocol/debug output while testing
-	curl_easy_setopt(curl_handle, CURLOPT_VERBOSE, 0L);
- 
-	// disable progress meter, set to 0L to enable it
-	curl_easy_setopt(curl_handle, CURLOPT_NOPROGRESS, 1L);
- 
-	// send all data to this function
-	curl_easy_setopt(curl_handle, CURLOPT_WRITEFUNCTION, write_data_to_stringstream);
- 
-	// write the page body to this string stream
-	curl_easy_setopt(curl_handle, CURLOPT_WRITEDATA, (void*)(&strFile));
- 
-	// get it!
-	curl_easy_perform(curl_handle);
- 
-	// cleanup curl stuff
-	curl_easy_cleanup(curl_handle);
- 
-	curl_global_cleanup();
-
-	return 0;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-class AutodatamanRepoMD {
-
-public:
-	///	<summary>
-	///		Clear the repo.
-	///	</summary>
-	void clear() {
-		m_strVersion = "";
-		m_vecDatasetNames.clear();
-	}
-
-	///	<summary>
-	///		Populate from JSON object.
-	///	</summary>
-	int from_JSON(
-		nlohmann::json & jmeta
-	) {
-		// Convert to local object
-		auto itjrepo = jmeta.find("_REPO");
-		if (itjrepo == jmeta.end()) {
-			_EXCEPTIONT("Malformed repository metadata file (missing \"_REPO\" key)");
-		}
-		auto itjtype = itjrepo->find("type");
-		if (itjtype == itjrepo->end()) {
-			_EXCEPTIONT("Malformed repository metadata file (missing \"_REPO::type\" key)");
-		}
-		if (itjtype.value() != "autodataman") {
-			_EXCEPTIONT("Malformed repository metadata file (invalid \"_REPO::type\" value)");
-		}
-		auto itjversion = itjrepo->find("version");
-		if (itjversion == itjrepo->end()) {
-			_EXCEPTIONT("Malformed repository metadata file (missing \"_REPO::version\" key)");
-		}
-		if (!itjversion.value().is_string()) {
-			_EXCEPTIONT("Malformed repository metadata file (\"_REPO::version\" must be type \"string\")");
-		}
-		m_strVersion = itjversion.value();
-
-		// Datasets
-		auto itjdatasets = jmeta.find("_DATASETS");
-		if (itjdatasets == jmeta.end()) {
-			_EXCEPTIONT("Malformed repository metadata file (missing \"_DATASETS\" key)");
-		}
-		if (!itjdatasets.value().is_array()) {
-			_EXCEPTIONT("Malformed repository metadata file (\"_DATASETS\" must be type \"array\")");
-		}
-
-		for (size_t s = 0; s < itjdatasets->size(); s++) {
-			nlohmann::json & jdataset = (*itjdatasets)[s];
-			if (!jdataset.is_string()) {
-				_EXCEPTIONT("Malformed repository metadata file (\"_DATASETS\" must be an array of strings");
-			}
-			m_vecDatasetNames.push_back(jdataset);
-		}
-
-		printf("Repository contains %lu dataset(s).\n", m_vecDatasetNames.size());
-
-		return 0;
-	}
-
-	///	<summary>
-	///		Populate from server.
-	///	</summary>
-	int from_server(
-		const std::string & strServer
-	) {
-		// Repo metadata
-		std::string strServerMetadata = strServer;
-		if (strServer[strServer.length()-1] != '/') {
-			strServerMetadata += "/";
-		}
-		strServerMetadata += "repo.txt";
-
-		// Notify user
-		printf("Attempting to download server metadata file \"%s\"\n",
-			strServerMetadata.c_str());
- 
-		// Download the metadata file from the server
-		std::stringstream strFile;
-		curl_download_to_stringstream(strServerMetadata, strFile);
-
-		// Parse into a JSON object
-		printf("Download completed successfully.  Parsing metadata file.\n");
-
-		std::cout << "=============================================" << std::endl;
-		std::cout << strFile.str() << std::endl;
-		std::cout << "=============================================" << std::endl;
-
-		nlohmann::json jmeta;
-		try {
-			jmeta = nlohmann::json::parse(strFile.str());
-		} catch (nlohmann::json::parse_error& e) {
-			_EXCEPTION3("Malformed repository metadata file "
-				"%s (%i) at byte position %i",
-				e.what(), e.id, e.byte);
-		}
-
-		printf("Validating and storing metadata.\n");
-
-		return from_JSON(jmeta);
-	}
-
-	///	<summary>
-	///		Get the current version number.
-	///	</summary>
-	const std::string & get_version() const {
-		return m_strVersion;
-	}
-
-	///	<summary>
-	///		Get the vector of dataset names.
-	///	</summary>
-	const std::vector<std::string> & get_dataset_names() const {
-		return m_vecDatasetNames;
-	}
-
-protected:
-	///	<summary>
-	///		Version number.
-	///	</summary>
-	std::string m_strVersion;
-
-	///	<summary>
-	///		List of available datasets.
-	///	</summary>
-	std::vector<std::string> m_vecDatasetNames;
-};
-
-///////////////////////////////////////////////////////////////////////////////
-
-class AutodatamanRepoDatasetMD {
-
-public:
-	///	<summary>
-	///		Clear the repo.
-	///	</summary>
-	void clear() {
-		m_strShortName = "";
-		m_strLongName = "";
-		m_strSource = "";
-		m_strDefaultVersion = "";
-		m_vecDatasetVersions.clear();
-	}
-
-	///	<summary>
-	///		Populate from JSON object.
-	///	</summary>
-	int from_JSON(
-		nlohmann::json & jmeta
-	) {
-		// Convert to local object
-		auto itjdataset = jmeta.find("_DATASET");
-		if (itjdataset == jmeta.end()) {
-			_EXCEPTIONT("Malformed repository metadata file (missing \"_DATASET\" key)");
-		}
-
-		// Short name
-		auto itjshortname = itjdataset->find("short_name");
-		if (itjshortname == itjdataset->end()) {
-			_EXCEPTIONT("Malformed repository metadata file (missing \"_DATASET::short_name\" key)");
-		}
-		if (!itjshortname.value().is_string()) {
-			_EXCEPTIONT("Malformed repository metadata file (\"_DATASET::short_name\" must be type \"string\")");
-		}
-		m_strShortName = itjshortname.value();
-
-		// Long name
-		auto itjlongname = itjdataset->find("long_name");
-		if (itjlongname == itjdataset->end()) {
-			_EXCEPTIONT("Malformed repository metadata file (missing \"_DATASET::long_name\" key)");
-		}
-		if (!itjlongname.value().is_string()) {
-			_EXCEPTIONT("Malformed repository metadata file (\"_DATASET::long_name\" must be type \"string\")");
-		}
-		m_strLongName = itjlongname.value();
-
-		// Source
-		auto itjsource = itjdataset->find("source");
-		if (itjsource == itjdataset->end()) {
-			_EXCEPTIONT("Malformed repository metadata file (missing \"_DATASET::source\" key)");
-		}
-		if (!itjsource.value().is_string()) {
-			_EXCEPTIONT("Malformed repository metadata file (\"_DATASET::source\" must be type \"string\")");
-		}
-		m_strSource = itjsource.value();
-
-		// Versions
-		auto itjversions = jmeta.find("_VERSIONS");
-		if (itjversions == jmeta.end()) {
-			_EXCEPTIONT("Malformed repository metadata file (missing \"_VERSIONS\" key)");
-		}
-		if (!itjversions.value().is_array()) {
-			_EXCEPTIONT("Malformed repository metadata file (\"_VERSIONS\" must be type \"array\")");
-		}
-
-		for (size_t s = 0; s < itjversions->size(); s++) {
-			nlohmann::json & jversion = (*itjversions)[s];
-			if (!jversion.is_string()) {
-				_EXCEPTIONT("Malformed repository metadata file (\"_VERSIONS\" must be an array of strings");
-			}
-			m_vecDatasetVersions.push_back(jversion);
-		}
-
-		printf("Dataset contains %lu version(s).\n", m_vecDatasetVersions.size());
-
-		return 0;
-	}
-
-	///	<summary>
-	///		Populate from server.
-	///	</summary>
-	int from_server(
-		const std::string & strServer,
-		const std::string & strDataset
-	) {
-		// Repo metadata
-		std::string strServerMetadata = strServer;
-		if (strServer[strServer.length()-1] != '/') {
-			strServerMetadata += "/";
-		}
-		strServerMetadata += strDataset + std::string("/dataset.txt");
- 
-		// Download the metadata file from the server
-		std::stringstream strFile;
-		curl_download_to_stringstream(strServerMetadata, strFile);
-
-		// Parse into a JSON object
-		printf("Download completed successfully.  Parsing metadata file.\n");
-
-		std::cout << "=============================================" << std::endl;
-		std::cout << strFile.str() << std::endl;
-		std::cout << "=============================================" << std::endl;
-
-		nlohmann::json jmeta;
-		try {
-			jmeta = nlohmann::json::parse(strFile.str());
-		} catch (nlohmann::json::parse_error& e) {
-			_EXCEPTION3("Malformed repository metadata file "
-				"%s (%i) at byte position %i",
-				e.what(), e.id, e.byte);
-		}
-
-		printf("Validating and storing metadata.\n");
-
-		return from_JSON(jmeta);
-	}
-
-	///	<summary>
-	///		Get the dataset short name.
-	///	</summary>
-	const std::string & get_short_name() const {
-		return m_strShortName;
-	}
-
-	///	<summary>
-	///		Get the dataset long name.
-	///	</summary>
-	const std::string & get_long_name() const {
-		return m_strLongName;
-	}
-
-	///	<summary>
-	///		Get the dataset source.
-	///	</summary>
-	const std::string & get_source() const {
-		return m_strSource;
-	}
-
-	///	<summary>
-	///		Get the vector of dataset names.
-	///	</summary>
-	const std::vector<std::string> & get_dataset_names() const {
-		return m_vecDatasetNames;
-	}
-
-protected:
-	///	<summary>
-	///		Short name.
-	///	</summary>
-	std::string m_strShortName;
-
-	///	<summary>
-	///		Long name.
-	///	</summary>
-	std::string m_strLongName;
-
-	///	<summary>
-	///		Source.
-	///	</summary>
-	std::string m_strSource;
-
-	///	<summary>
-	///		Default version.
-	///	</summary>
-	std::string m_strDefaultVersion;
-
-	///	<summary>
-	///		List of available datasets.
-	///	</summary>
-	std::vector<std::string> m_vecDatasetVersions;
-
-};
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -745,17 +372,18 @@ int adm_avail(
 
 ///////////////////////////////////////////////////////////////////////////////
  
-int adm_info(
-	const std::string & strServer,
-	const std::string & strLocalRepo,
-	const std::string & strDataset
+int adm_list(
+	const std::string & strRepo
 ) {
+	// Local repository path
+	printf("Displaying information for repo \"%s\"\n", strRepo.c_str());
+
 	// Load repository descriptor from remote data server
-	AutodatamanRepoDatasetMD admrepodataset;
-	int iStatus = admrepodataset.from_server(strServer, strDataset);
+	AutodatamanRepoMD admrepo;
+	int iStatus = admrepo.from_local_repo(strRepo);
 
 	// List available datasets
-	const std::vector<std::string> & vecDatasets = admrepodataset.get_dataset_names();
+	const std::vector<std::string> & vecDatasets = admrepo.get_dataset_names();
 	for (int i = 0; i < vecDatasets.size(); i++) {
 		printf("  %s\n", vecDatasets[i].c_str());
 	}
@@ -765,10 +393,58 @@ int adm_info(
 
 ///////////////////////////////////////////////////////////////////////////////
  
-int adm_list() {
-	// Load repository descriptor from local repository
+int adm_info(
+	const std::string & strServer,
+	const std::string & strLocalRepo,
+	const std::string & strDataset
+) {
+	{
+		// Load repository descriptor from remote data server
+		AutodatamanRepoDatasetMD admrepodataset;
+		int iStatus = admrepodataset.from_server(strServer, strDataset);
 
-	// List contents of the repository
+		// Output information
+		printf("== SERVER COPY ==============================\n");
+		printf("Long name:  %s\n", admrepodataset.get_long_name().c_str());
+		printf("Short name: %s\n", admrepodataset.get_short_name().c_str());
+		printf("Source:     %s\n", admrepodataset.get_source().c_str());
+		printf("Versions available:\n");
+
+		// List available datasets
+		const std::vector<std::string> & vecVersions = admrepodataset.get_dataset_versions();
+		for (int i = 0; i < vecVersions.size(); i++) {
+			if (vecVersions[i] == admrepodataset.get_default_version()) {
+				printf("  %s [default]\n", vecVersions[i].c_str());
+			} else {
+				printf("  %s\n", vecVersions[i].c_str());
+			}
+		}
+		printf("=============================================\n");
+	}
+
+	{
+		// Load repository descriptor from local data server
+		AutodatamanRepoDatasetMD admrepodataset;
+		int iStatus = admrepodataset.from_local_repo(strLocalRepo, strDataset);
+
+		// Output information
+		printf("== LOCAL COPY ===============================\n");
+		printf("Long name:  %s\n", admrepodataset.get_long_name().c_str());
+		printf("Short name: %s\n", admrepodataset.get_short_name().c_str());
+		printf("Source:     %s\n", admrepodataset.get_source().c_str());
+		printf("Versions available:\n");
+
+		// List available datasets
+		const std::vector<std::string> & vecVersions = admrepodataset.get_dataset_versions();
+		for (int i = 0; i < vecVersions.size(); i++) {
+			if (vecVersions[i] == admrepodataset.get_default_version()) {
+				printf("  %s [default]\n", vecVersions[i].c_str());
+			} else {
+				printf("  %s\n", vecVersions[i].c_str());
+			}
+		}
+		printf("=============================================\n");
+	}
 
 	return 0;
 }
@@ -791,12 +467,128 @@ int adm_remove() {
 
 ///////////////////////////////////////////////////////////////////////////////
  
-int adm_get() {
-	// Load source repository descriptor
+int adm_get(
+	const std::string & strServer,
+	const std::string & strLocalRepo,
+	const std::string & strDataset
+) {
+	// Break up dataset into name and version
+	std::string strDatasetName;
+	std::string strDatasetVersion;
+	if (strDataset.length() == 0) {
+		_EXCEPTIONT("Missing dataset name\n");
+	}
+	for (int i = 0; i < strDataset.length(); i++) {
+		if (strDataset[i] == '/') {
+			if ((strDatasetName != "") || (strDatasetVersion != "")) {
+				_EXCEPTIONT("Multiple forward-slash characters in dataset specifier\n");
+			}
+			if (i == 0) {
+				_EXCEPTIONT("Missing dataset name\n");
+			}
+			if (i == strDataset.length()-1) {
+				_EXCEPTIONT("Missing dataset version\n");
+			}
+			strDatasetName = strDataset.substr(0, i-1);
+			strDatasetVersion = strDataset.substr(i+1);
+		}
+	}
+	if (strDatasetName == "") {
+		strDatasetName = strDataset;
+	}
+
+	// Load repository descriptor from remote data server
+	AutodatamanRepoMD admserver;
+	int iStatus = admserver.from_server(strServer);
+	_ASSERT(iStatus == 0);
 
 	// Verify requested dataset exists in the repository
+	int iServerDataset = admserver.find_dataset(strDatasetName);
+	if (iServerDataset == (-1)) {
+		_EXCEPTION1("Dataset \"%s\" not found on remote server\n",
+			strDataset.c_str());
+	}
 
-	// Create directory on local repository
+	// Load dataset descriptor from remote data server
+	AutodatamanRepoDatasetMD admserverdataset;
+	iStatus = admserverdataset.from_server(strServer, strDataset);
+	_ASSERT(iStatus == 0);
+
+	// Use default version number, if not specified
+	if (strDatasetVersion == "") {
+		strDatasetVersion = admserverdataset.get_default_version();
+		if (strDatasetVersion == "") {
+			_EXCEPTION1("No default version of dataset \"%s\" available on server",
+				strDatasetName.c_str());
+		}
+		printf("Default dataset version \"%s\"\n", strDatasetVersion.c_str());
+	}
+
+	// Verify requested version exists in the repository
+	int iServerVersion = admserverdataset.find_version(strDatasetVersion);
+	if (iServerVersion == (-1)) {
+		_EXCEPTION1("Version \"%s\" not found on remote server\n",
+			strDatasetVersion.c_str());
+	}
+
+	// Download data descriptor from remote data server
+	AutodatamanRepoDataMD admserverdata;
+	iStatus = admserverdata.from_server(strServer, strDataset, strDatasetVersion);
+	_ASSERT(iStatus == 0);
+
+	// Load repository descriptor from local data server
+	AutodatamanRepoMD admlocalrepo;
+	iStatus = admlocalrepo.from_local_repo(strLocalRepo);
+	_ASSERT(iStatus == 0);
+
+	// Check if dataset exists in the local repository
+	AutodatamanRepoDatasetMD admlocaldataset;
+
+	int iLocalDataset = admlocalrepo.find_dataset(strDatasetName);
+	if (iLocalDataset == (-1)) {
+		// Create dataset directory
+		filesystem::path pathDataset =
+			filesystem::path(strLocalRepo)/filesystem::path(strDatasetName);
+		bool fSuccess = filesystem::create_directory(pathDataset);
+		if (!fSuccess) {
+			_EXCEPTION1("Unable to create directory \"%s\"",
+				pathDataset.str().c_str());
+		}
+
+		// Copy metadata
+		admlocaldataset = admserverdataset;
+
+		// Write metadata
+
+	} else {
+		// Load the metadata file
+		admlocaldataset.from_local_repo(strLocalRepo, strDatasetName);
+	}
+
+	// Check if version exists in the local repository
+	AutodatamanRepoDataMD admlocaldata;
+
+	int iLocalVersion = admlocaldataset.find_version(strDatasetVersion);
+	if (iLocalVersion == (-1)) {
+	} else {
+		// Load the metadata file
+		admlocaldata.from_local_repo(strLocalRepo, strDatasetName, strDatasetVersion);
+
+		// Check for equivalence
+		if (admserverdata == admlocaldata) {
+			printf("Specified dataset \"%s\" already exists on local repo.  Overwrite? [y/N] ",
+				strDataset.c_str());
+		} else {
+			printf("== SERVER COPY ==============================\n");
+			admserverdata.summary();
+			printf("== LOCAL COPY ===============================\n");
+			admlocaldata.summary();
+			printf("=============================================\n");
+			printf("WARNING: Specified dataset \"%s\" exists on local repo, "
+				"but metadata descriptor does not match.  This could mean "
+				"that one or both datasets are corrupt.  Overwrite? [Y/n] \n", strDataset.c_str());
+		}
+	}
 
 	// Download data
 
@@ -991,7 +783,92 @@ int main(int argc, char **argv) {
 		}
 
 		std::string strLocalRepo;
-/*
+		itFlagServer = mapFlags.find("l");
+		if (itFlagServer != mapFlags.end()) {
+			if (itFlagServer->second.size() != 1) {
+				strParseError = "Error: Invalid or missing server name specified with \"-l\"";
+			} else {
+				strLocalRepo = itFlagServer->second[0];
+			}
+		} else {
+			int iStatus = adm_getrepo_string(strLocalRepo);
+			if (iStatus != 0) {
+				return iStatus;
+			}
+		}
+
+		return adm_info(strRemoteServer, strLocalRepo, strDataset);
+	}
+
+	// Check for data on the local repository
+	if (strCommand == "list") {
+		CommandLineFlagSpec spec;
+		spec["l"] = 1;
+
+		CommandLineFlagMap mapFlags;
+		CommandLineArgVector vecArgs;
+
+		std::string strParseError =
+			ParseCommandLine(2, argc, argv, spec, mapFlags, vecArgs);
+
+		if (vecArgs.size() > 0) {
+			strParseError = "Error: Invalid or missing arguments";
+		}
+
+		std::string strLocalRepo;
+		auto itFlagServer = mapFlags.find("l");
+		if (itFlagServer != mapFlags.end()) {
+			if (itFlagServer->second.size() != 1) {
+				strParseError = "Error: Invalid or missing repo specified with \"-l\"";
+			} else {
+				strLocalRepo = itFlagServer->second[0];
+			}
+		} else {
+			int iStatus = adm_getrepo_string(strLocalRepo);
+			if (iStatus != 0) {
+				return iStatus;
+			}
+		}
+
+		if (strParseError != "") {
+			printf("%s\nUsage: %s list [-l <local repo dir>]\n",
+				strParseError.c_str(), strExecutable.c_str());
+			return 1;
+		}
+
+		return adm_list(strLocalRepo);
+	}
+
+	// Remove data from the local repository
+	if (strCommand == "remove") {
+	}
+
+	// Get data from the remote repository and store in the local repository
+	if (strCommand == "get") {
+		CommandLineFlagSpec spec;
+		spec["s"] = 1;
+		spec["l"] = 1;
+
+		CommandLineFlagMap mapFlags;
+		CommandLineArgVector vecArgs;
+
+		std::string strParseError =
+			ParseCommandLine(2, argc, argv, spec, mapFlags, vecArgs);
+
+		std::string strDataset;
+		if (vecArgs.size() != 1) {
+			strParseError = "Error: Invalid or missing arguments";
+		} else {
+			strDataset = vecArgs[0];
+		}
+
+		if (strParseError != "") {
+			printf("%s\nUsage: %s avail [-s <server>]\n",
+				strParseError.c_str(), strExecutable.c_str());
+			return 1;
+		}
+
+		std::string strRemoteServer;
 		auto itFlagServer = mapFlags.find("s");
 		if (itFlagServer != mapFlags.end()) {
 			if (itFlagServer->second.size() != 1) {
@@ -1005,56 +882,30 @@ int main(int argc, char **argv) {
 				return iStatus;
 			}
 		}
-*/
-		return adm_info(strRemoteServer, strLocalRepo, strDataset);
+
+		std::string strLocalRepo;
+		itFlagServer = mapFlags.find("l");
+		if (itFlagServer != mapFlags.end()) {
+			if (itFlagServer->second.size() != 1) {
+				strParseError = "Error: Invalid or missing server name specified with \"-l\"";
+			} else {
+				strLocalRepo = itFlagServer->second[0];
+			}
+		} else {
+			int iStatus = adm_getrepo_string(strLocalRepo);
+			if (iStatus != 0) {
+				return iStatus;
+			}
+		}
+
+		return adm_get(strRemoteServer, strLocalRepo, strDataset);
 	}
 
 	// Put data on the server
 	if (strCommand == "put") {
 		//return adm_put();
 	}
- /*
-	CURL *curl_handle;
-	static const char *pagefilename = "page.out";
-	FILE *pagefile;
  
-	curl_global_init(CURL_GLOBAL_ALL);
- 
-	// init the curl session
-	curl_handle = curl_easy_init();
- 
-	// set URL to get here
-	curl_easy_setopt(curl_handle, CURLOPT_URL, argv[1]);
- 
-	// Switch on full protocol/debug output while testing
-	curl_easy_setopt(curl_handle, CURLOPT_VERBOSE, 1L);
- 
-	// disable progress meter, set to 0L to enable it
-	curl_easy_setopt(curl_handle, CURLOPT_NOPROGRESS, 1L);
- 
-	// send all data to this function
-	curl_easy_setopt(curl_handle, CURLOPT_WRITEFUNCTION, write_data);
- 
-	// open the file
-	pagefile = fopen(pagefilename, "wb");
-	if(pagefile) {
- 
-		// write the page body to this file handle
-		curl_easy_setopt(curl_handle, CURLOPT_WRITEDATA, pagefile);
- 
-		// get it!
-		curl_easy_perform(curl_handle);
- 
-		// close the header file
-		fclose(pagefile);
-	}
- 
-	// cleanup curl stuff
-	curl_easy_cleanup(curl_handle);
- 
-	curl_global_cleanup();
- */
-
 	} catch(Exception & e) {
 		std::cout << e.ToString() << std::endl;
 		return 1;
