@@ -34,7 +34,7 @@ Validate the datasets on the local repo.
 autodataman remove [-f] [-l <local repo dir>] [-s <server>] <dataset id>[/version]
 Remove a dataset from the local data server.
 
-autodataman get [-l <local repo dir>]  [-s <server>] <dataset id>[/<version>]
+autodataman get [-f] [-l <local repo dir>]  [-s <server>] <dataset id>[/<version>]
 Get the specified dataset from the remote data server and store it on the local data repo or remote server.
 
 autodataman put [-l <local repo dir>] [-s <server>] [-c <compression type>] <dataset dir>/<version>

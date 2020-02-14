@@ -279,6 +279,22 @@ public:
 	}
 
 	///	<summary>
+	///		Construct a JSON object from this object.
+	///	</summary>
+	void to_JSON(
+		nlohmann::json & jmeta
+	) {
+		jmeta["_DATASET"]["short_name"] = m_strShortName;
+		jmeta["_DATASET"]["long_name"] = m_strLongName;
+		jmeta["_DATASET"]["source"] = m_strSource;
+		jmeta["_DATASET"]["default"] = m_strDefaultVersion;
+		auto jsonFiles = jmeta["_VERSIONS"] = nlohmann::json::array();
+		for (auto i = 0; i < m_vecDatasetVersions.size(); i++) {
+			jsonFiles.push_back(m_vecDatasetVersions[i]);
+		}
+	}
+
+	///	<summary>
 	///		Populate from server.
 	///	</summary>
 	int from_server(
@@ -480,6 +496,46 @@ public:
 	}
 
 	///	<summary>
+	///		Construct a JSON object from this object.
+	///	</summary>
+	void to_JSON(
+		nlohmann::json & jmeta
+	) {
+		jmeta["filename"] = m_strFilename;
+		jmeta["MD5sum"] = m_strMD5sum;
+		jmeta["format"] = m_strFormat;
+		jmeta["on_download"] = m_strOnDownload;
+	}
+
+	///	<summary>
+	///		Get the filename.
+	///	</summary>
+	const std::string & get_filename() const {
+		return m_strFilename;
+	}
+
+	///	<summary>
+	///		Get the MD5sum.
+	///	</summary>
+	const std::string & get_md5sum() const {
+		return m_strMD5sum;
+	}
+
+	///	<summary>
+	///		Get the format.
+	///	</summary>
+	const std::string & get_format() const {
+		return m_strFormat;
+	}
+
+	///	<summary>
+	///		Get the format.
+	///	</summary>
+	const std::string & get_ondownload() const {
+		return m_strOnDownload;
+	}
+
+	///	<summary>
 	///		Print summary to screen.
 	///	</summary>
 	void summary() const {
@@ -604,6 +660,23 @@ public:
 	}
 
 	///	<summary>
+	///		Construct a JSON object from this object.
+	///	</summary>
+	void to_JSON(
+		nlohmann::json & jmeta
+	) {
+		jmeta["_DATASET"]["version"] = m_strVersion;
+		jmeta["_DATASET"]["date"] = m_strDate;
+		jmeta["_DATASET"]["source"] = m_strSource;
+		auto jsonFiles = jmeta["_FILES"] = nlohmann::json::array();
+		for (auto i = 0; i < m_vecFiles.size(); i++) {
+			nlohmann::json jfilemeta;
+			m_vecFiles[i].to_JSON(jfilemeta);
+			jsonFiles.push_back(jfilemeta);
+		}
+	}
+
+	///	<summary>
 	///		Populate from server.
 	///	</summary>
 	int from_server(
@@ -709,6 +782,20 @@ public:
 			(m_strVersion == admdatamd.m_strVersion) &&
 			(m_strDate == admdatamd.m_strDate) &&
 			(m_strSource == admdatamd.m_strSource));
+	}
+
+	///	<summary>
+	///		Get the number of files.
+	///	</summary>
+	size_t size() const {
+		return m_vecFiles.size();
+	}
+
+	///	<summary>
+	///		Indexing operator.
+	///	</summary>
+	const AutodatamanRepoFileMD & operator[](size_t s) {
+		return m_vecFiles[s];
 	}
 
 protected:

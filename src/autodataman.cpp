@@ -451,7 +451,11 @@ int adm_info(
 
 ///////////////////////////////////////////////////////////////////////////////
  
-int adm_remove() {
+int adm_remove(
+	const std::string & strLocalRepo,
+	const std::string & strDataset,
+	const std::string & strVersion
+) {
 	// Verify directory exists in repository
 
 	// Double check with user
@@ -470,14 +474,22 @@ int adm_remove() {
 int adm_get(
 	const std::string & strServer,
 	const std::string & strLocalRepo,
-	const std::string & strDataset
+	const std::string & strDataset,
+	bool fForceOverwrite
 ) {
-	// Break up dataset into name and version
-	std::string strDatasetName;
-	std::string strDatasetVersion;
+	if (strServer.length() == 0) {
+		_EXCEPTIONT("Missing server url\n");
+	}
+	if (strLocalRepo.length() == 0) {
+		_EXCEPTIONT("Missing local repo path\n");
+	}
 	if (strDataset.length() == 0) {
 		_EXCEPTIONT("Missing dataset name\n");
 	}
+
+	// Break up dataset into name and version
+	std::string strDatasetName;
+	std::string strDatasetVersion;
 	for (int i = 0; i < strDataset.length(); i++) {
 		if (strDataset[i] == '/') {
 			if ((strDatasetName != "") || (strDatasetVersion != "")) {
@@ -546,6 +558,7 @@ int adm_get(
 
 	int iLocalDataset = admlocalrepo.find_dataset(strDatasetName);
 	if (iLocalDataset == (-1)) {
+/*
 		// Create dataset directory
 		filesystem::path pathDataset =
 			filesystem::path(strLocalRepo)/filesystem::path(strDatasetName);
@@ -554,12 +567,23 @@ int adm_get(
 			_EXCEPTION1("Unable to create directory \"%s\"",
 				pathDataset.str().c_str());
 		}
-
+*/
 		// Copy metadata
 		admlocaldataset = admserverdataset;
-
+/*
 		// Write metadata
-
+		nlohmann::json jmeta;
+		admlocaldataset.to_JSON(jmeta);
+		filesystem::path pathDatasetJSON =
+			pathDataset/filesystem::path("dataset.json");
+		std::ofstream ofmeta(pathDatasetJSON.str());
+		if (!ofmeta.is_open()) {
+			_EXCEPTION1("Unable to open output dataset metadata file \"%s\"",
+				pathDatasetJSON.str().c_str());
+		}
+		ofmeta << jmeta;
+		ofmeta.close();
+*/
 	} else {
 		// Load the metadata file
 		admlocaldataset.from_local_repo(strLocalRepo, strDatasetName);
@@ -569,15 +593,22 @@ int adm_get(
 	AutodatamanRepoDataMD admlocaldata;
 
 	int iLocalVersion = admlocaldataset.find_version(strDatasetVersion);
-	if (iLocalVersion == (-1)) {
-	} else {
-		// Load the metadata file
+	if (iLocalVersion != (-1)) {
+		// Load the local metadata file
 		admlocaldata.from_local_repo(strLocalRepo, strDatasetName, strDatasetVersion);
 
 		// Check for equivalence
 		if (admserverdata == admlocaldata) {
-			printf("Specified dataset \"%s\" already exists on local repo.  Overwrite? [y/N] ",
+			printf("Specified dataset \"%s\" already exists on local repo.  ",
 				strDataset.c_str());
+
+			if (!fForceOverwrite) {
+				printf("Rerun with \"-f\" to force overwrite.\n");
+				return 0;
+			} else {
+				printf("Overwriting with server data.\n");
+			}
+
 		} else {
 			printf("== SERVER COPY ==============================\n");
 			admserverdata.summary();
@@ -586,11 +617,64 @@ int adm_get(
 			printf("=============================================\n");
 			printf("WARNING: Specified dataset \"%s\" exists on local repo, "
 				"but metadata descriptor does not match.  This could mean "
-				"that one or both datasets are corrupt.  Overwrite? [Y/n] \n", strDataset.c_str());
+				"that one or both datasets are corrupt.  ",
+				strDataset.c_str());
+
+			if (!fForceOverwrite) {
+				printf("Rerun with \"-f\" to force overwrite.\n");
+				return 0;
+			} else {
+				printf("Overwriting with server data.\n");
+			}
 		}
+
+		// Remove the local copy of this dataset
+		//adm_remove(strLocalRepo, strDatasetName, strDatasetVersion);
+
+	} else {
+/*
+		// Create data directory
+		filesystem::path pathDataset =
+			filesystem::path(strLocalRepo)/filesystem::path(strDatasetName);
+		bool fSuccess = filesystem::create_directory(pathDataset);
+		if (!fSuccess) {
+			_EXCEPTION1("Unable to create directory \"%s\"",
+				pathDataset.str().c_str());
+		}
+*/
+		admlocaldata = admserverdata;
 	}
 
 	// Download data
+	std::string strRemoteFilePath = strServer;
+	_ASSERT(strRemoteFilePath.length() > 0);
+	if (strRemoteFilePath[strRemoteFilePath.length()-1] != '/') {
+		strRemoteFilePath += "/";
+	}
+	strRemoteFilePath += strDatasetName + "/" + strDatasetVersion + "/";
+
+	std::string strLocalFilePath = strLocalRepo;
+	_ASSERT(strLocalFilePath.length() > 0);
+	if (strLocalFilePath[strLocalFilePath.length()-1] != '/') {
+		strLocalFilePath += "/";
+	}
+
+	for (int i = 0; i < admlocaldata.size(); i++) {
+		const AutodatamanRepoFileMD & admlocalfile = admlocaldata[i];
+
+		std::string strRemoteFile =
+			strRemoteFilePath + admlocalfile.get_filename();
+
+		std::string strLocalFile =
+			strLocalFilePath + admlocalfile.get_filename();
+
+		printf("Downloading \"%s\"\n", admlocalfile.get_filename().c_str());
+
+		iStatus = curl_download_file(strRemoteFile, strLocalFile);
+		if (iStatus != 0) {
+			printf("Error: Unable to write file \"%s\"\n", strLocalFile.c_str());
+		}
+	}
 
 	// Load target repository descriptor
 
@@ -848,6 +932,7 @@ int main(int argc, char **argv) {
 		CommandLineFlagSpec spec;
 		spec["s"] = 1;
 		spec["l"] = 1;
+		spec["f"] = 0;
 
 		CommandLineFlagMap mapFlags;
 		CommandLineArgVector vecArgs;
@@ -863,7 +948,7 @@ int main(int argc, char **argv) {
 		}
 
 		if (strParseError != "") {
-			printf("%s\nUsage: %s avail [-s <server>]\n",
+			printf("%s\nUsage: %s [-f] [-l <local repo dir>]  [-s <server>] <dataset id>[/<version>]\n",
 				strParseError.c_str(), strExecutable.c_str());
 			return 1;
 		}
@@ -898,7 +983,9 @@ int main(int argc, char **argv) {
 			}
 		}
 
-		return adm_get(strRemoteServer, strLocalRepo, strDataset);
+		bool fForceOverwrite = (mapFlags.find("f") != mapFlags.end());
+
+		return adm_get(strRemoteServer, strLocalRepo, strDataset, fForceOverwrite);
 	}
 
 	// Put data on the server
