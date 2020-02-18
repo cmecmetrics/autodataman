@@ -113,14 +113,36 @@ class AutodatamanNamelist : public Namelist {
 
 public:
 	///	<summary>
+	///		Check for valid namelist variables.
+	///	</summary>
+	static bool IsValidVariable(
+		const std::string & str
+	) {
+		if ((str == "tgz_open_command") ||
+		    (str == "default_local_repo") ||
+		    (str == "default_server")
+		) {
+			return true;
+		}
+		return false;
+	}
+
+public:
+	///	<summary>
 	///		Constructor.
 	///	</summary>
 	AutodatamanNamelist() :
 		Namelist()
-	{
-	}
+	{ }
 
 protected:
+	///	<summary>
+	///		Set the default namelist variables.
+	///	</summary>
+	void SetDefault() {
+		(*this)["tgz_open_command"] = "tar -xzf ";
+	}
+
 	///	<summary>
 	///		Initialize the autodataman path.
 	///	</summary>
@@ -131,7 +153,7 @@ protected:
 		if (homedir != NULL) {
 			filesystem::path pathNamelist(homedir);
 			if (!pathNamelist.exists()) {
-				printf("ERROR environment variable $HOME points to an invalid home directory path\n");
+				_EXCEPTIONT("Environment variable $HOME points to an invalid home directory path\n");
 				return 1;
 			}
 			m_path = pathNamelist/filesystem::path(".autodataman");
@@ -143,13 +165,13 @@ protected:
 		struct passwd *pw = getpwuid(uid);
 
 		if (pw == NULL) {
-			printf("ERROR unable to identify .autodataman\n");
+			_EXCEPTIONT("Unable to identify path for .autodataman");
 			return 1;
 		}
 
 		filesystem::path pathNamelist(pw->pw_dir);
 		if (!pathNamelist.exists()) {
-			printf("ERROR pwd points to an invalid home directory path\n");
+			_EXCEPTIONT("pwd points to an invalid home directory path");
 			return 1;
 		}
 		m_path = pathNamelist/filesystem::path(".autodataman");
@@ -168,6 +190,10 @@ public:
 		if (m_path.exists()) {
 			int iStatus = FromFile(m_path.str());
 			if (iStatus) return iStatus;
+
+		// If not populate default values
+		} else {
+			SetDefault();
 		}
 
 		return 0;
@@ -213,6 +239,45 @@ int adm_getserver_string(
 	if (iStatus) return iStatus;
 
 	str = nml["default_server"];
+
+	return 0;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+int adm_config_get() {
+	// Load .autodataman
+	AutodatamanNamelist nml;
+	int iStatus = nml.LoadFromUser();
+	if (iStatus) return iStatus;
+
+	printf("Configuration:\n");
+	for (auto iter = nml.begin(); iter != nml.end(); iter++) {
+		printf("  %s= %s\n", iter->first.c_str(), iter->second.c_str());
+	}
+
+	return 0;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+int adm_config_set(
+	const std::string & strVariable,
+	const std::string & strValue
+) {
+	if (!AutodatamanNamelist::IsValidVariable(strVariable)) {
+		printf("Invalid config variable \"%s\"\n", strVariable.c_str());
+		return 1;
+	}
+
+	AutodatamanNamelist nml;
+	int iStatus = nml.LoadFromUser();
+	if (iStatus) return iStatus;
+
+	nml[strVariable] = strValue;
+
+	iStatus = nml.SaveToUser();
+	if (iStatus) return iStatus;
 
 	return 0;
 }
@@ -327,7 +392,7 @@ int adm_setserver(
 	iStatus = nml.SaveToUser();
 	if (iStatus) return iStatus;
 
-	printf("SUCCESSFULLY set autodataman server to \"%s\"\n", strServer.c_str());
+	printf("Default autodataman server set to \"%s\"\n", strServer.c_str());
 
 	return 0;
 }
@@ -515,6 +580,7 @@ int adm_get(
 		strDatasetName = strDataset;
 	}
 
+	////////////////////////////////////////////////////
 	// Load repository descriptor from remote data server
 	AutodatamanRepoMD admserver;
 	int iStatus = admserver.from_server(strServer);
@@ -562,6 +628,7 @@ int adm_get(
 	// Dataset path
 	filesystem::path pathDataset = filesystem::path(strLocalRepo);
 
+	////////////////////////////////////////////////////
 	// Check if dataset exists in the local repository
 	AutodatamanRepoDatasetMD admlocaldataset;
 
@@ -575,17 +642,12 @@ int adm_get(
 		pathDataset = pathDataset/filesystem::path(strDatasetName + ".part");
 		bool fSuccess = filesystem::create_directory(pathDataset);
 		if (!fSuccess) {
-			_EXCEPTION1("Unable to create directory \"%s\"",
-				pathDataset.str().c_str());
+			//_EXCEPTION1("Unable to create directory \"%s\"",
+			//	pathDataset.str().c_str());
 		}
 
 		// Copy metadata
 		admlocaldataset.set_from_admdataset(admserverdataset);
-
-		// Write metadata
-		filesystem::path pathDatasetJSON =
-			pathDataset/filesystem::path("dataset.txt");
-		admlocaldataset.to_file(pathDatasetJSON.str());
 
 	// Dataset exists in local repository
 	} else {
@@ -609,10 +671,11 @@ int adm_get(
 	// Create data directory
 	bool fSuccess = filesystem::create_directory(pathVersion);
 	if (!fSuccess) {
-		_EXCEPTION1("Unable to create directory \"%s\".  Try running \"repair\" on repo.",
-			pathDataset.str().c_str());
+		//_EXCEPTION1("Unable to create directory \"%s\".  Try running \"repair\" on repo.",
+		//	pathDataset.str().c_str());
 	}
 
+	////////////////////////////////////////////////////
 	// Check if version exists in the local repository
 	AutodatamanRepoDataMD admlocaldata;
 
@@ -620,7 +683,6 @@ int adm_get(
 
 	// Does not exist in local repository
 	if (iLocalVersion == (-1)) {
-
 		admlocaldata = admserverdata;
 
 	// Exists in local repository
@@ -658,13 +720,22 @@ int adm_get(
 				printf("Overwriting with server data.\n");
 			}
 		}
+
+		// Overwrite
+		admlocaldata = admserverdata;
 	}
 
 	// Write metadata
 	filesystem::path pathDatasetJSON =
 		pathVersion/filesystem::path("data.txt");
+
+	if (fVerbose)
+		printf("Writing version metadata to \"%s\"\n",
+			pathDatasetJSON.str().c_str());
+
 	admlocaldata.to_file(pathDatasetJSON.str());
 
+	////////////////////////////////////////////////////
 	// Download data
 	printf("=============================================\n");
 	std::string strRemoteFilePath = strServer;
@@ -685,7 +756,7 @@ int adm_get(
 
 		printf("Downloading \"%s\"\n", admlocalfile.get_filename().c_str());
 		if (fVerbose) printf("Local target \"%s\"\n", pathFile.str().c_str());
-
+/*
 		iStatus = curl_download_file(strRemoteFile, pathFile.str());
 		if (iStatus != 0) {
 			_EXCEPTION1("ERROR: Unable to write file \"%s\". Aborting.",
@@ -710,10 +781,59 @@ int adm_get(
 		} else {
 			printf("Verified SHA256 %s\n", strSHA256.c_str());
 		}
+*/
 	}
 	printf("=============================================\n");
 
+	////////////////////////////////////////////////////
 	// Apply OnDownload operations
+	
+	// Load the namelist
+	AutodatamanNamelist nml;
+	iStatus = nml.LoadFromUser();
+	if (iStatus) return iStatus;
+
+	// Apply system commands
+	bool fHasOnDownload = false;
+	for (int i = 0; i < admlocaldata.size(); i++) {
+		const AutodatamanRepoFileMD & admlocalfile = admlocaldata[i];
+
+		filesystem::path pathFile =
+			pathVersion/filesystem::path(admlocalfile.get_filename());
+
+		if (admlocalfile.get_ondownload() != "") {
+			fHasOnDownload = true;
+
+			std::string strNamelistVar =
+				admlocalfile.get_format() + "_"
+				+ admlocalfile.get_ondownload() + "_command";
+
+			std::string strCommand =
+				std::string("cd ") + pathVersion.str() + " && "
+				+ nml[strNamelistVar] + pathFile.str()
+				+ " && rm " + pathFile.str();
+
+			if (strCommand != "") {
+				strCommand += " " + pathFile.str();
+				printf("Executing \"%s\"\n", strCommand.c_str());
+				std::system(strCommand.c_str());
+			}
+		}
+	}
+
+	if (fHasOnDownload) {
+		printf("=============================================\n");
+	}
+
+	////////////////////////////////////////////////////
+	// Everything good so far
+
+	// Write dataset metadata
+	{
+		admlocaldataset.add_version(strDatasetVersion);
+		filesystem::path pathDatasetMetaJSON = pathDataset/filesystem::path("dataset.txt");
+		admlocaldataset.to_file(pathDatasetMetaJSON.str());
+	}
 
 	return 0;
 }
@@ -730,6 +850,7 @@ int main(int argc, char **argv) {
 	// Check command line arguments
 	if (argc < 2) {
 		printf("Usage:\n");
+		printf("%s config [<variable> <value>]\n", strExecutable.c_str());
 		printf("%s initrepo <local repo dir>\n", strExecutable.c_str());
 		printf("%s setrepo <local repo dir>\n", strExecutable.c_str());
 		printf("%s getrepo\n", strExecutable.c_str());
@@ -750,6 +871,23 @@ int main(int argc, char **argv) {
 	std::vector<std::string> vecArg;
 	for (int c = 2; c < argc; c++) {
 		vecArg.push_back(argv[c]);
+	}
+
+	// Configure
+	if (strCommand == "config") {
+		if (argc == 2) {
+			return adm_config_get();
+
+		} else if (argc == 4) {
+			std::string strVariable = argv[2];
+			std::string strValue = argv[3];
+
+			return adm_config_set(strVariable, strValue);
+
+		} else {
+			printf("Usage: %s config [<variable> <value>]\n", strExecutable.c_str());
+			return 1;
+		}
 	}
 
 	// Initialize a repository directory with no content

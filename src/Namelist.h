@@ -32,6 +32,16 @@ public:
 	///	</summary>
 	typedef std::pair<std::string, std::string> KeyValuePair;
 
+	///	<summary>
+	///		Vector containing key value pairs.
+	///	</summary>
+	typedef std::vector<KeyValuePair> KeyValuePairVector;
+
+	///	<summary>
+	///		Constant iterator to KeyValuePairVector.
+	///	</summary>
+	typedef KeyValuePairVector::const_iterator const_iterator;
+
 private:
 	///	<summary>
 	///		Remove whitespace from the string.
@@ -196,6 +206,20 @@ public:
 			KeyValuePair(str, std::string("")));
 
 		return (m_vecKeyValuePairs[m_vecKeyValuePairs.size()-1].second);
+	}
+
+	///	<summary>
+	///		Beginning of vector.
+	///	</summary>
+	const_iterator begin() const {
+		return m_vecKeyValuePairs.begin();
+	}
+
+	///	<summary>
+	///		End of vector.
+	///	</summary>
+	const_iterator end() const {
+		return m_vecKeyValuePairs.end();
 	}
 
 public:

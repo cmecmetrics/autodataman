@@ -345,7 +345,7 @@ public:
 		jmeta["_DATASET"]["long_name"] = m_strLongName;
 		jmeta["_DATASET"]["source"] = m_strSource;
 		jmeta["_DATASET"]["default"] = m_strDefaultVersion;
-		auto jsonFiles = jmeta["_VERSIONS"] = nlohmann::json::array();
+		nlohmann::json & jsonFiles = jmeta["_VERSIONS"] = nlohmann::json::array();
 		for (auto i = 0; i < m_vecDatasetVersions.size(); i++) {
 			jsonFiles.push_back(m_vecDatasetVersions[i]);
 		}
@@ -475,7 +475,17 @@ public:
 	}
 
 	///	<summary>
-	///		Check if the repo contains the given dataset name.
+	///		Add the given version name to the repo.
+	///	</summary>
+	void add_version(const std::string & strVersion) {
+		if (find_version(strVersion) != (-1)) {
+			_EXCEPTION1("Trying to add existing version \"%s\"", strVersion.c_str());
+		}
+		m_vecDatasetVersions.push_back(strVersion);
+	}
+
+	///	<summary>
+	///		Check if the repo contains the given version name.
 	///	</summary>
 	int find_version(const std::string & strVersion) const {
 		for (int i = 0; i < m_vecDatasetVersions.size(); i++) {
@@ -738,10 +748,10 @@ public:
 	void to_JSON(
 		nlohmann::json & jmeta
 	) {
-		jmeta["_DATASET"]["version"] = m_strVersion;
-		jmeta["_DATASET"]["date"] = m_strDate;
-		jmeta["_DATASET"]["source"] = m_strSource;
-		auto jsonFiles = jmeta["_FILES"] = nlohmann::json::array();
+		jmeta["_DATA"]["version"] = m_strVersion;
+		jmeta["_DATA"]["date"] = m_strDate;
+		jmeta["_DATA"]["source"] = m_strSource;
+		nlohmann::json & jsonFiles = jmeta["_FILES"] = nlohmann::json::array();
 		for (auto i = 0; i < m_vecFiles.size(); i++) {
 			nlohmann::json jfilemeta;
 			m_vecFiles[i].to_JSON(jfilemeta);
