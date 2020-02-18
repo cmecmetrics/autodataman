@@ -30,10 +30,24 @@ class AutodatamanRepoMD {
 
 public:
 	///	<summary>
+	///		Constructor.
+	///	</summary>
+	AutodatamanRepoMD() {
+		m_strVersion = version();
+	}
+
+	///	<summary>
+	///		Get the version number.
+	///	</summary>
+	static std::string version() {
+		return std::string("2020-02-13 (v0.1)");
+	}
+
+	///	<summary>
 	///		Clear the repo.
 	///	</summary>
 	void clear() {
-		m_strVersion = "";
+		m_strVersion = version();
 		m_vecDatasetNames.clear();
 	}
 
@@ -84,6 +98,36 @@ public:
 		printf("Repository contains %lu dataset(s)\n", m_vecDatasetNames.size());
 
 		return 0;
+	}
+
+	///	<summary>
+	///		Construct a JSON object from this object.
+	///	</summary>
+	void to_JSON(
+		nlohmann::json & jmeta
+	) {
+		jmeta["_REPO"]["type"] = "autodataman";
+		jmeta["_REPO"]["version"] = "2020-02-13 (v0.1)";
+		auto jsonFiles = jmeta["_DATASETS"] = nlohmann::json::array();
+		for (auto i = 0; i < m_vecDatasetNames.size(); i++) {
+			jsonFiles.push_back(m_vecDatasetNames[i]);
+		}
+	}
+
+	///	<summary>
+	///		Write the metadata file.
+	///	</summary>
+	void to_file(
+		const std::string & strFile
+	) {
+		std::ofstream ofs(strFile);
+		if (!ofs.is_open()) {
+			_EXCEPTION1("Unable to open file \"%s\" for writing", strFile.c_str());
+		}
+		nlohmann::json jmeta;
+		to_JSON(jmeta);
+		ofs << jmeta;
+		ofs.close();
 	}
 
 	///	<summary>
@@ -215,6 +259,19 @@ public:
 	}
 
 	///	<summary>
+	///		Set metadata from another AutodatamanRepoDatasetMD.
+	///	</summary>
+	void set_from_admdataset(
+		const AutodatamanRepoDatasetMD & admdataset
+	) {
+		m_strShortName = admdataset.m_strShortName;
+		m_strLongName = admdataset.m_strLongName;
+		m_strSource = admdataset.m_strSource;
+		m_strDefaultVersion = admdataset.m_strDefaultVersion;
+		m_vecDatasetVersions.clear();
+	}
+
+	///	<summary>
 	///		Populate from JSON object.
 	///	</summary>
 	int from_JSON(
@@ -292,6 +349,22 @@ public:
 		for (auto i = 0; i < m_vecDatasetVersions.size(); i++) {
 			jsonFiles.push_back(m_vecDatasetVersions[i]);
 		}
+	}
+
+	///	<summary>
+	///		Write the metadata file.
+	///	</summary>
+	void to_file(
+		const std::string & strFile
+	) {
+		std::ofstream ofs(strFile);
+		if (!ofs.is_open()) {
+			_EXCEPTION1("Unable to open file \"%s\" for writing", strFile.c_str());
+		}
+		nlohmann::json jmeta;
+		to_JSON(jmeta);
+		ofs << jmeta;
+		ofs.close();
 	}
 
 	///	<summary>
@@ -462,15 +535,15 @@ public:
 		}
 		m_strFilename = itjfilename.value();
 
-		// MD5sum
-		auto itjmd5sum = jmeta.find("MD5sum");
-		if (itjmd5sum == jmeta.end()) {
-			_EXCEPTIONT("Malformed repository metadata file (missing \"_FILES::MD5sum\" key)");
+		// SHA256sum
+		auto itjsha256sum = jmeta.find("SHA256sum");
+		if (itjsha256sum == jmeta.end()) {
+			_EXCEPTIONT("Malformed repository metadata file (missing \"_FILES::SHA256sum\" key)");
 		}
-		if (!itjmd5sum.value().is_string()) {
-			_EXCEPTIONT("Malformed repository metadata file (\"_FILES::MD5sum\" must be type \"string\")");
+		if (!itjsha256sum.value().is_string()) {
+			_EXCEPTIONT("Malformed repository metadata file (\"_FILES::SHA256sum\" must be type \"string\")");
 		}
-		m_strMD5sum = itjmd5sum.value();
+		m_strSHA256sum = itjsha256sum.value();
 
 		// Format
 		auto itjformat = jmeta.find("format");
@@ -502,7 +575,7 @@ public:
 		nlohmann::json & jmeta
 	) {
 		jmeta["filename"] = m_strFilename;
-		jmeta["MD5sum"] = m_strMD5sum;
+		jmeta["SHA256sum"] = m_strSHA256sum;
 		jmeta["format"] = m_strFormat;
 		jmeta["on_download"] = m_strOnDownload;
 	}
@@ -515,10 +588,10 @@ public:
 	}
 
 	///	<summary>
-	///		Get the MD5sum.
+	///		Get the SHA256sum.
 	///	</summary>
-	const std::string & get_md5sum() const {
-		return m_strMD5sum;
+	const std::string & get_sha256sum() const {
+		return m_strSHA256sum;
 	}
 
 	///	<summary>
@@ -540,7 +613,7 @@ public:
 	///	</summary>
 	void summary() const {
 		printf("  Filename:   %s\n", m_strFilename.c_str());
-		printf("  MD5sum:     %s\n", m_strMD5sum.c_str());
+		printf("  SHA256sum:  %s\n", m_strSHA256sum.c_str());
 		printf("  Format:     %s\n", m_strFormat.c_str());
 		printf("  OnDownload: %s\n", m_strOnDownload.c_str());
 	}
@@ -551,7 +624,7 @@ public:
 	bool operator== (const AutodatamanRepoFileMD & admfilemd) const {
 		return (
 			(m_strFilename == admfilemd.m_strFilename) &&
-			(m_strMD5sum == admfilemd.m_strMD5sum) &&
+			(m_strSHA256sum == admfilemd.m_strSHA256sum) &&
 			(m_strFormat == admfilemd.m_strFormat) &&
 			(m_strOnDownload == admfilemd.m_strOnDownload));
 	}
@@ -563,9 +636,9 @@ protected:
 	std::string m_strFilename;
 
 	///	<summary>
-	///		MD5sum.
+	///		SHA256sum.
 	///	</summary>
-	std::string m_strMD5sum;
+	std::string m_strSHA256sum;
 
 	///	<summary>
 	///		Format.
@@ -677,6 +750,22 @@ public:
 	}
 
 	///	<summary>
+	///		Write the metadata file.
+	///	</summary>
+	void to_file(
+		const std::string & strFile
+	) {
+		std::ofstream ofs(strFile);
+		if (!ofs.is_open()) {
+			_EXCEPTION1("Unable to open file \"%s\" for writing", strFile.c_str());
+		}
+		nlohmann::json jmeta;
+		to_JSON(jmeta);
+		ofs << jmeta;
+		ofs.close();
+	}
+
+	///	<summary>
 	///		Populate from server.
 	///	</summary>
 	int from_server(
@@ -712,7 +801,7 @@ public:
 				e.what(), e.id, e.byte);
 		}
 
-		printf("Validating and storing metadata.\n");
+		printf("Validating and deserializing metadata.\n");
 
 		return from_JSON(jmeta);
 	}
