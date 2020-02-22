@@ -19,22 +19,22 @@ Set the default data server URL.
 autodataman getserver
 Get the default data server URL.
 
-autodataman avail [-s <server>]
+autodataman avail [-v] [-s <server>]
 List datasets available on the given remote server.
 
-autodataman info [-l <local repo dir>] [-s <server>] <dataset id>
+autodataman info [-v] [-l <local repo dir>] [-s <server>] <dataset id>
 Give detailed information on the given dataset id.
 
-autodataman list [-l <local repo dir>]
+autodataman list [-v] [-l <local repo dir>]
 List datasets available on the local data server.
 
 autodataman validate [-l <local repo dir>]
 Validate the datasets on the local repo.
 
-autodataman remove [-f] [-l <local repo dir>] [-s <server>] <dataset id>[/version]
+autodataman remove [-v] [-l <local repo dir>] <dataset id>[/version]
 Remove a dataset from the local data server.
 
-autodataman get [-f] [-l <local repo dir>]  [-s <server>] <dataset id>[/<version>]
+autodataman get [-f] [-v] [-l <local repo dir>]  [-s <server>] <dataset id>[/<version>]
 Get the specified dataset from the remote data server and store it on the local data repo or remote server.
 
 autodataman put [-l <local repo dir>] [-s <server>] [-c <compression type>] <dataset dir>/<version>

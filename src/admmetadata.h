@@ -54,9 +54,11 @@ public:
 	///	<summary>
 	///		Populate from JSON object.
 	///	</summary>
-	int from_JSON(
+	void from_JSON(
 		nlohmann::json & jmeta
 	) {
+		clear();
+
 		// Convert to local object
 		auto itjrepo = jmeta.find("_REPO");
 		if (itjrepo == jmeta.end()) {
@@ -94,10 +96,6 @@ public:
 			}
 			m_vecDatasetNames.push_back(jdataset);
 		}
-
-		printf("Repository contains %lu dataset(s)\n", m_vecDatasetNames.size());
-
-		return 0;
 	}
 
 	///	<summary>
@@ -108,7 +106,7 @@ public:
 	) {
 		jmeta["_REPO"]["type"] = "autodataman";
 		jmeta["_REPO"]["version"] = "2020-02-13 (v0.1)";
-		auto jsonFiles = jmeta["_DATASETS"] = nlohmann::json::array();
+		auto & jsonFiles = jmeta["_DATASETS"] = nlohmann::json::array();
 		for (auto i = 0; i < m_vecDatasetNames.size(); i++) {
 			jsonFiles.push_back(m_vecDatasetNames[i]);
 		}
@@ -120,7 +118,7 @@ public:
 	void to_file(
 		const std::string & strFile
 	) {
-		std::ofstream ofs(strFile);
+		std::ofstream ofs(strFile, std::ios::out | std::ios::trunc);
 		if (!ofs.is_open()) {
 			_EXCEPTION1("Unable to open file \"%s\" for writing", strFile.c_str());
 		}
@@ -133,8 +131,9 @@ public:
 	///	<summary>
 	///		Populate from server.
 	///	</summary>
-	int from_server(
-		const std::string & strServer
+	void from_server(
+		const std::string & strServer,
+		bool fVerbose = false
 	) {
 		// Repo metadata
 		std::string strServerMetadata = strServer;
@@ -144,19 +143,21 @@ public:
 		strServerMetadata += "repo.txt";
 
 		// Notify user
-		printf("Displaying information for server \"%s\"\n", strServer.c_str());
+		if (fVerbose) printf("Attempting to access server \"%s\"\n", strServer.c_str());
  
 		// Download the metadata file from the server
 		std::stringstream strFile;
 		curl_download_to_stringstream(strServerMetadata, strFile);
 
+		// Verbose output
+		if (fVerbose) {
+			std::cout << "== SERVER REPO METADATA FILE ================" << std::endl;
+			std::cout << strServerMetadata << std::endl;
+			std::cout << strFile.str() << std::endl;
+			std::cout << "=============================================" << std::endl;
+		}
+
 		// Parse into a JSON object
-		printf("Parsing server metadata file.\n");
-
-		std::cout << "=============================================" << std::endl;
-		std::cout << strFile.str() << std::endl;
-		std::cout << "=============================================" << std::endl;
-
 		nlohmann::json jmeta;
 		try {
 			jmeta = nlohmann::json::parse(strFile.str());
@@ -166,16 +167,19 @@ public:
 				e.what(), e.id, e.byte);
 		}
 
-		printf("Validating and deserializing metadata.\n");
+		//if (fVerbose) printf("Validating and deserializing repo metadata.\n");
 
-		return from_JSON(jmeta);
+		from_JSON(jmeta);
+
+		if (fVerbose) printf("Remote server contains %lu dataset(s)\n", num_datasets());
 	}
 
 	///	<summary>
 	///		Populate from local repository.
 	///	</summary>
-	int from_local_repo(
-		const std::string & strRepoPath
+	void from_local_repo(
+		const std::string & strRepoPath,
+		bool fVerbose = false
 	) {
 		// Repo metadata
 		std::string strRepoMetadataPath = strRepoPath;
@@ -198,10 +202,11 @@ public:
 				e.what(), e.id, e.byte);
 		}
 
-		printf("Validating and deserializing metadata.\n");
+		//if (fVerbose) printf("Validating and deserializing repo metadata.\n");
 
-		return from_JSON(jmeta);
+		from_JSON(jmeta);
 
+		if (fVerbose) printf("Local repository contains %lu dataset(s).\n", num_datasets());
 	}
 
 	///	<summary>
@@ -228,6 +233,23 @@ public:
 			}
 		}
 		return (-1);
+	}
+
+	///	<summary>
+	///		Add the given dataset to the repo.
+	///	</summary>
+	void add_dataset(const std::string & strDataset) {
+		if (find_dataset(strDataset) != (-1)) {
+			_EXCEPTION1("Trying to add existing dataset \"%s\"", strDataset.c_str());
+		}
+		m_vecDatasetNames.push_back(strDataset);
+	}
+
+	///	<summary>
+	///		Number of datasets in the repo.
+	///	</summary>
+	size_t num_datasets() const {
+		return m_vecDatasetNames.size();
 	}
 
 protected:
@@ -274,9 +296,11 @@ public:
 	///	<summary>
 	///		Populate from JSON object.
 	///	</summary>
-	int from_JSON(
+	void from_JSON(
 		nlohmann::json & jmeta
 	) {
+		clear();
+
 		// Convert to local object
 		auto itjdataset = jmeta.find("_DATASET");
 		if (itjdataset == jmeta.end()) {
@@ -329,10 +353,6 @@ public:
 			}
 			m_vecDatasetVersions.push_back(jversion);
 		}
-
-		printf("Dataset contains %lu version(s)\n", m_vecDatasetVersions.size());
-
-		return 0;
 	}
 
 	///	<summary>
@@ -357,7 +377,7 @@ public:
 	void to_file(
 		const std::string & strFile
 	) {
-		std::ofstream ofs(strFile);
+		std::ofstream ofs(strFile, std::ios::out | std::ios::trunc);
 		if (!ofs.is_open()) {
 			_EXCEPTION1("Unable to open file \"%s\" for writing", strFile.c_str());
 		}
@@ -370,9 +390,10 @@ public:
 	///	<summary>
 	///		Populate from server.
 	///	</summary>
-	int from_server(
+	void from_server(
 		const std::string & strServer,
-		const std::string & strDataset
+		const std::string & strDataset,
+		bool fVerbose
 	) {
 		// Repo metadata
 		std::string strServerMetadata = strServer;
@@ -385,13 +406,15 @@ public:
 		std::stringstream strFile;
 		curl_download_to_stringstream(strServerMetadata, strFile);
 
+		// Verbose output
+		if (fVerbose) {
+			std::cout << "== SERVER DATASET METADATA FILE =============" << std::endl;
+			std::cout << strServerMetadata << std::endl;
+			std::cout << strFile.str() << std::endl;
+			std::cout << "=============================================" << std::endl;
+		}
+
 		// Parse into a JSON object
-		printf("Download completed successfully.  Parsing metadata file.\n");
-
-		std::cout << "=============================================" << std::endl;
-		std::cout << strFile.str() << std::endl;
-		std::cout << "=============================================" << std::endl;
-
 		nlohmann::json jmeta;
 		try {
 			jmeta = nlohmann::json::parse(strFile.str());
@@ -401,17 +424,18 @@ public:
 				e.what(), e.id, e.byte);
 		}
 
-		printf("Validating and storing metadata.\n");
+		from_JSON(jmeta);
 
-		return from_JSON(jmeta);
+		if (fVerbose) printf("Remote dataset contains %lu version(s).\n", num_versions());
 	}
 
 	///	<summary>
 	///		Populate from local repository.
 	///	</summary>
-	int from_local_repo(
+	void from_local_repo(
 		const std::string & strRepoPath,
-		const std::string & strDataset
+		const std::string & strDataset,
+		bool fVerbose
 	) {
 		// Repo metadata
 		std::string strRepoMetadataPath = strRepoPath;
@@ -434,9 +458,9 @@ public:
 				e.what(), e.id, e.byte);
 		}
 
-		printf("Validating and deserializing metadata.\n");
+		from_JSON(jmeta);
 
-		return from_JSON(jmeta);
+		if (fVerbose) printf("Local dataset contains %lu versions(s).\n", num_versions());
 	}
 
 	///	<summary>
@@ -496,6 +520,13 @@ public:
 		return (-1);
 	}
 
+	///	<summary>
+	///		Number of versions in the dataset.
+	///	</summary>
+	size_t num_versions() const {
+		return m_vecDatasetVersions.size();
+	}
+
 protected:
 	///	<summary>
 	///		Short name.
@@ -530,11 +561,23 @@ class AutodatamanRepoFileMD {
 
 public:
 	///	<summary>
+	///		Clear the file.
+	///	</summary>
+	void clear() {
+		m_strFilename = "";
+		m_strSHA256sum = "";
+		m_strFormat = "";
+		m_strOnDownload = "";
+	}
+
+	///	<summary>
 	///		Populate from JSON object.
 	///	</summary>
-	int from_JSON(
+	void from_JSON(
 		nlohmann::json & jmeta
 	) {
+		clear();
+
 		// Filename
 		auto itjfilename = jmeta.find("filename");
 		if (itjfilename == jmeta.end()) {
@@ -574,8 +617,6 @@ public:
 
 			m_strOnDownload = itjondownload.value();
 		}
-
-		return 0;
 	}
 
 	///	<summary>
@@ -678,9 +719,11 @@ public:
 	///	<summary>
 	///		Populate from JSON object.
 	///	</summary>
-	int from_JSON(
+	void from_JSON(
 		nlohmann::json & jmeta
 	) {
+		clear();
+
 		// Convert to local object
 		auto itjdata = jmeta.find("_DATA");
 		if (itjdata == jmeta.end()) {
@@ -732,14 +775,9 @@ public:
 				_EXCEPTIONT("Malformed repository metadata file (\"_FILES\" must be an array of objects");
 			}
 			AutodatamanRepoFileMD admfilemd;
-			int iStatus = admfilemd.from_JSON(jfile);
-			_ASSERT(iStatus == 0);
+			admfilemd.from_JSON(jfile);
 			m_vecFiles.push_back(admfilemd);
 		}
-
-		printf("Dataset contains %lu files(s)\n", m_vecFiles.size());
-
-		return 0;
 	}
 
 	///	<summary>
@@ -765,7 +803,7 @@ public:
 	void to_file(
 		const std::string & strFile
 	) {
-		std::ofstream ofs(strFile);
+		std::ofstream ofs(strFile, std::ios::out | std::ios::trunc);
 		if (!ofs.is_open()) {
 			_EXCEPTION1("Unable to open file \"%s\" for writing", strFile.c_str());
 		}
@@ -778,10 +816,11 @@ public:
 	///	<summary>
 	///		Populate from server.
 	///	</summary>
-	int from_server(
+	void from_server(
 		const std::string & strServer,
 		const std::string & strDataset,
-		const std::string & strVersion
+		const std::string & strVersion,
+		bool fVerbose
 	) {
 		// Repo metadata
 		std::string strServerMetadata = strServer;
@@ -795,13 +834,15 @@ public:
 		std::stringstream strFile;
 		curl_download_to_stringstream(strServerMetadata, strFile);
 
+		// Verbose output
+		if (fVerbose) {
+			std::cout << "== SERVER DATASET/VERSION METADATA FILE =====" << std::endl;
+			std::cout << strServerMetadata << std::endl;
+			std::cout << strFile.str() << std::endl;
+			std::cout << "=============================================" << std::endl;
+		}
+
 		// Parse into a JSON object
-		printf("Download completed successfully.  Parsing metadata file.\n");
-
-		std::cout << "=============================================" << std::endl;
-		std::cout << strFile.str() << std::endl;
-		std::cout << "=============================================" << std::endl;
-
 		nlohmann::json jmeta;
 		try {
 			jmeta = nlohmann::json::parse(strFile.str());
@@ -811,18 +852,21 @@ public:
 				e.what(), e.id, e.byte);
 		}
 
-		printf("Validating and deserializing metadata.\n");
+		//if (fVerbose) printf("Validating and deserializing metadata.\n");
 
-		return from_JSON(jmeta);
+		from_JSON(jmeta);
+
+		if (fVerbose) printf("Remote version contains %lu files(s).\n", num_files());
 	}
 
 	///	<summary>
 	///		Populate from local repository.
 	///	</summary>
-	int from_local_repo(
+	void from_local_repo(
 		const std::string & strRepoPath,
 		const std::string & strDataset,
-		const std::string & strVersion
+		const std::string & strVersion,
+		bool fVerbose
 	) {
 		// Repo metadata
 		std::string strRepoMetadataPath = strRepoPath;
@@ -846,9 +890,9 @@ public:
 				e.what(), e.id, e.byte);
 		}
 
-		printf("Validating and deserializing metadata.\n");
+		from_JSON(jmeta);
 
-		return from_JSON(jmeta);
+		if (fVerbose) printf("Local version contains %lu file(s).\n", num_files());
 	}
 
 	///	<summary>
@@ -886,7 +930,7 @@ public:
 	///	<summary>
 	///		Get the number of files.
 	///	</summary>
-	size_t size() const {
+	size_t num_files() const {
 		return m_vecFiles.size();
 	}
 

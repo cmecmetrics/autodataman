@@ -15,6 +15,8 @@
 #ifndef _ADMCURL_H_
 #define _ADMCURL_H_
 
+#include "Exception.h"
+
 #include <curl/curl.h>
 
 #include <string>
@@ -44,7 +46,7 @@ static size_t write_data_to_stringstream(
 
 ///////////////////////////////////////////////////////////////////////////////
 
-int curl_download_to_stringstream(
+void curl_download_to_stringstream(
 	const std::string & strURL,
 	std::stringstream & strFile
 ) {
@@ -78,8 +80,6 @@ int curl_download_to_stringstream(
 	curl_easy_cleanup(curl_handle);
  
 	curl_global_cleanup();
-
-	return 0;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -96,7 +96,7 @@ static size_t write_data_to_file(
 
 ///////////////////////////////////////////////////////////////////////////////
 
-int curl_download_file(
+void curl_download_file(
 	const std::string & strURL,
 	const std::string & strFilename
 ) {
@@ -134,15 +134,13 @@ int curl_download_file(
 		fclose(pagefile);
 
 	} else {
-		return 1;
+		_EXCEPTION1("Unable to write file \"%s\".", strFilename.c_str());
 	}
  
 	// cleanup curl stuff
 	curl_easy_cleanup(curl_handle);
  
 	curl_global_cleanup();
-
-	return 0;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
