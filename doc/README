@@ -31,7 +31,7 @@ List datasets available on the local data server.
 autodataman validate [-l <local repo dir>]
 Validate the datasets on the local repo.
 
-autodataman remove [-v] [-l <local repo dir>] <dataset id>[/version]
+autodataman remove [-a] [-v] [-l <local repo dir>] <dataset id>[/version]
 Remove a dataset from the local data server.
 
 autodataman get [-f] [-v] [-l <local repo dir>]  [-s <server>] <dataset id>[/<version>]

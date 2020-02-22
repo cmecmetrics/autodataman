@@ -143,7 +143,7 @@ public:
 		strServerMetadata += "repo.txt";
 
 		// Notify user
-		if (fVerbose) printf("Attempting to access server \"%s\"\n", strServer.c_str());
+		if (fVerbose) printf("Contacting server \"%s\"\n", strServer.c_str());
  
 		// Download the metadata file from the server
 		std::stringstream strFile;
@@ -171,7 +171,7 @@ public:
 
 		from_JSON(jmeta);
 
-		if (fVerbose) printf("Remote server contains %lu dataset(s)\n", num_datasets());
+		if (fVerbose) printf("Server contains %lu dataset(s)\n", num_datasets());
 	}
 
 	///	<summary>
@@ -243,6 +243,19 @@ public:
 			_EXCEPTION1("Trying to add existing dataset \"%s\"", strDataset.c_str());
 		}
 		m_vecDatasetNames.push_back(strDataset);
+	}
+
+	///	<summary>
+	///		Remove the given dataset to the repo.
+	///	</summary>
+	void remove_dataset(const std::string & strDataset) {
+		for (auto it = m_vecDatasetNames.begin(); it != m_vecDatasetNames.end(); it++) {
+			if (strDataset == *it) {
+				m_vecDatasetNames.erase(it);
+				return;
+			}
+		}
+		_EXCEPTION1("Trying to remove nonexistant dataset \"%s\"", strDataset.c_str());
 	}
 
 	///	<summary>
@@ -494,7 +507,7 @@ public:
 	///	<summary>
 	///		Get the vector of dataset names.
 	///	</summary>
-	const std::vector<std::string> & get_dataset_versions() const {
+	const std::vector<std::string> & get_version_names() const {
 		return m_vecDatasetVersions;
 	}
 
@@ -506,6 +519,19 @@ public:
 			_EXCEPTION1("Trying to add existing version \"%s\"", strVersion.c_str());
 		}
 		m_vecDatasetVersions.push_back(strVersion);
+	}
+
+	///	<summary>
+	///		Remove the given version to the repo.
+	///	</summary>
+	void remove_version(const std::string & strVersion) {
+		for (auto it = m_vecDatasetVersions.begin(); it != m_vecDatasetVersions.end(); it++) {
+			if (strVersion == *it) {
+				m_vecDatasetVersions.erase(it);
+				return;
+			}
+		}
+		_EXCEPTION1("Trying to remove nonexistant version \"%s\"", strVersion.c_str());
 	}
 
 	///	<summary>

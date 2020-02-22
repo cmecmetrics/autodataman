@@ -215,6 +215,36 @@ protected:
 
 ///////////////////////////////////////////////////////////////////////////////
 
+///	<summary>
+///		Break up dataset string into name and version.
+///	</summary>
+void get_dataset_name_version(
+	const std::string & strDataset,
+	std::string & strDatasetName,
+	std::string & strDatasetVersion
+) {
+	for (int i = 0; i < strDataset.length(); i++) {
+		if (strDataset[i] == '/') {
+			if ((strDatasetName != "") || (strDatasetVersion != "")) {
+				_EXCEPTIONT("Multiple forward-slash characters in dataset specifier\n");
+			}
+			if (i == 0) {
+				_EXCEPTIONT("Missing dataset name\n");
+			}
+			if (i == strDataset.length()-1) {
+				_EXCEPTIONT("Missing dataset version\n");
+			}
+			strDatasetName = strDataset.substr(0, i);
+			strDatasetVersion = strDataset.substr(i+1);
+		}
+	}
+	if (strDatasetName == "") {
+		strDatasetName = strDataset;
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 int adm_getrepo_string(
 	std::string & str
 ) {
@@ -426,11 +456,13 @@ int adm_avail(
 
 	// List available datasets
 	if (admrepo.num_datasets() == 0) {
-		printf("Server contains no datasets.\n");
+		printf("Server \"%s\" contains no datasets.\n",
+			strServer.c_str());
 		return 0;
 	}
 	
-	if (!fVerbose) printf("Server contains %lu dataset(s)\n", admrepo.num_datasets());
+	if (!fVerbose) printf("Server \"%s\" contains %lu dataset(s)\n",
+		strServer.c_str(), admrepo.num_datasets());
 
 	const std::vector<std::string> & vecDatasets = admrepo.get_dataset_names();
 	for (int i = 0; i < vecDatasets.size(); i++) {
@@ -443,27 +475,37 @@ int adm_avail(
 ///////////////////////////////////////////////////////////////////////////////
  
 int adm_list(
-	const std::string & strRepo,
+	const std::string & strLocalRepo,
 	bool fVerbose
 ) {
-	// Local repository path
-	printf("Displaying information for repo \"%s\"\n", strRepo.c_str());
-
 	// Load repository descriptor from remote data server
 	AutodatamanRepoMD admrepo;
-	admrepo.from_local_repo(strRepo);
+	admrepo.from_local_repo(strLocalRepo);
 
 	// List available datasets
 	if (admrepo.num_datasets() == 0) {
-		printf("Local repo contains no datasets.\n");
+		printf("Local repo \"%s\" contains no datasets\n", strLocalRepo.c_str());
 		return 0;
 	}
 
-	printf("Local repo contains %lu dataset(s)\n", admrepo.num_datasets());
+	printf("Local repo \"%s\" contains %lu dataset(s)\n",
+		strLocalRepo.c_str(), admrepo.num_datasets());
 
 	const std::vector<std::string> & vecDatasets = admrepo.get_dataset_names();
 	for (int i = 0; i < vecDatasets.size(); i++) {
-		printf("  %s\n", vecDatasets[i].c_str());
+
+		// Load dataset metadata from local data server
+		AutodatamanRepoDatasetMD admrepodataset;
+		admrepodataset.from_local_repo(strLocalRepo, vecDatasets[i], fVerbose);
+
+		// Display versions
+		const std::vector<std::string> & vecVersions = admrepodataset.get_version_names();
+		for (int j = 0; j < vecVersions.size(); j++) {
+			printf("  %s/%s\n", vecDatasets[i].c_str(), vecVersions[j].c_str());
+		}
+		if (vecVersions.size() == 0) {
+			printf("  %s (0 versions)\n", vecDatasets[i].c_str());
+		}
 	}
 
 	return 0;
@@ -478,8 +520,9 @@ int adm_info(
 	bool fVerbose
 ) {
 	printf("== SERVER COPY ==============================\n");
+	printf("Server \"%s\"\n", strServer.c_str());
 
-	// Load repository descriptor from remote data server
+	// Load repository metadata from remote data server
 	AutodatamanRepoMD admserver;
 	admserver.from_server(strServer, fVerbose);
 
@@ -490,7 +533,7 @@ int adm_info(
 			strDataset.c_str());
 
 	} else {
-		// Load repository descriptor from remote data server
+		// Load dataset metadata from remote data server
 		AutodatamanRepoDatasetMD admrepodataset;
 		admrepodataset.from_server(strServer, strDataset, fVerbose);
 
@@ -506,7 +549,7 @@ int adm_info(
 
 		// List available datasets
 		const std::vector<std::string> & vecVersions =
-			admrepodataset.get_dataset_versions();
+			admrepodataset.get_version_names();
 		for (int i = 0; i < vecVersions.size(); i++) {
 			if (vecVersions[i] == admrepodataset.get_default_version()) {
 				printf("  %s [default]\n", vecVersions[i].c_str());
@@ -517,8 +560,9 @@ int adm_info(
 	}
 
 	printf("== LOCAL COPY ===============================\n");
+	printf("Local repo \"%s\"\n", strLocalRepo.c_str());
 
-	// Load repository descriptor from local data server
+	// Load repository metadata from local data server
 	AutodatamanRepoMD admlocal;
 	admlocal.from_local_repo(strLocalRepo, fVerbose);
 
@@ -528,7 +572,7 @@ int adm_info(
 			strDataset.c_str());
 
 	} else {
-		// Load repository descriptor from local data server
+		// Load dataset metadata from local data server
 		AutodatamanRepoDatasetMD admrepodataset;
 		admrepodataset.from_local_repo(strLocalRepo, strDataset, fVerbose);
 
@@ -544,13 +588,16 @@ int adm_info(
 
 		// List available datasets
 		const std::vector<std::string> & vecVersions =
-			admrepodataset.get_dataset_versions();
+			admrepodataset.get_version_names();
 		for (int i = 0; i < vecVersions.size(); i++) {
 			if (vecVersions[i] == admrepodataset.get_default_version()) {
 				printf("  %s [default]\n", vecVersions[i].c_str());
 			} else {
 				printf("  %s\n", vecVersions[i].c_str());
 			}
+		}
+		if (vecVersions.size() == 0) {
+			printf("  (none)\n");
 		}
 		printf("=============================================\n");
 	}
@@ -563,6 +610,7 @@ int adm_info(
 int adm_remove(
 	const std::string & strLocalRepo,
 	const std::string & strDataset,
+	bool fRemoveAll,
 	bool fVerbose
 ) {
 	// Check arguments
@@ -573,15 +621,169 @@ int adm_remove(
 		_EXCEPTIONT("Missing dataset name\n");
 	}
 
-	// Verify directory exists in repository
+	// Repository information
+	printf("Local repo \"%s\"\n", strLocalRepo.c_str());
 
-	// Double check with user
+	// Break up dataset into name and version
+	std::string strDatasetName;
+	std::string strDatasetVersion;
+	get_dataset_name_version(strDataset, strDatasetName, strDatasetVersion);
 
-	// Load repository descriptor from local repository
+	// Path to repo
+	filesystem::path pathRepo = filesystem::path(strLocalRepo);
+	if (pathRepo.str().length() < 2) {
+		_EXCEPTION1("Invalid local repository name \"%s\"", pathRepo.str().c_str());
+	}
 
-	// Remove directory associated with files
+	// Get the local repo metadata
+	AutodatamanRepoMD admlocalrepo;
+	admlocalrepo.from_local_repo(strLocalRepo, fVerbose);
 
-	// Write repository descriptor
+	int iLocalDataset = admlocalrepo.find_dataset(strDatasetName);
+	if (iLocalDataset == (-1)) {
+		printf("Dataset \"%s\" not found in local repo\n",
+			strDatasetName.c_str());
+		return 1;
+	}
+
+	// Path to dataset
+	filesystem::path pathDataset = pathRepo/filesystem::path(strDatasetName);
+
+	if (!pathDataset.exists()) {
+		_EXCEPTION1("Damaged local repo.  Path \"%s\" does not exist in repo, "
+			"but is referenced in repo metadata.  Try running \"repair\" on repo.",
+			pathDataset.str().c_str());
+	}
+
+	if (!pathDataset.is_directory()) {
+		_EXCEPTION1("Damaged local repo.  Path \"%s\" is not a directory, "
+			"but is referenced in repo metadata.  Try running \"repair\" on repo.",
+			pathDataset.str().c_str());
+	}
+
+	// Load dataset metadata
+	AutodatamanRepoDatasetMD admlocaldataset;
+	admlocaldataset.from_local_repo(strLocalRepo, strDatasetName, fVerbose);
+
+	// No version specified; try to remove entire dataset
+	if (strDatasetVersion == "") {
+		if (admlocaldataset.num_versions() == 0) {
+			fRemoveAll = true;
+			printf("Removing dataset \"%s\" (0 versions)\n",
+				strDatasetName.c_str());
+		}
+		if (admlocaldataset.num_versions() == 1) {
+			fRemoveAll = true;
+			printf("Removing dataset \"%s\" (1 version)\n",
+				strDatasetName.c_str());
+		}
+
+		if (!fRemoveAll) {
+			printf("Dataset \"%s\" contains multiple versions (%lu).\n"
+				"To remove entire dataset rerun with \"-a\".\n",
+				strDatasetName.c_str(), admlocaldataset.num_versions());
+			return 1;
+
+		} else {
+			admlocalrepo.remove_dataset(strDatasetName);
+
+			std::string strCommand =
+				std::string("rm -rf ") + pathDataset.str();
+			if (fVerbose) printf("Executing \"%s\"\n", strCommand.c_str());
+
+			if (strCommand.length() < pathRepo.str().length() + 6) {
+				_EXCEPTIONT("Failsafe triggered:  For safety reasons, "
+					"aborting execution of command.");
+			}
+
+			int iResult = std::system(strCommand.c_str());
+			if (iResult != 0) {
+				_EXCEPTIONT("Command failed.  Aborting.");
+			}
+		}
+
+	// Version specified
+	} else {
+
+		// Check that version exists in metadata
+		int iLocalVersion = admlocaldataset.find_version(strDatasetVersion);
+		if (iLocalVersion == (-1)) {
+			printf("Version \"%s\" not found in local dataset \"%s\"\n",
+				strDatasetVersion.c_str(), strDatasetName.c_str());
+			return 1;
+		}
+
+		// Remove from metadata
+		admlocaldataset.remove_version(strDatasetVersion);
+
+		// Path to version
+		filesystem::path pathVersion = pathDataset/filesystem::path(strDatasetVersion);
+
+		if (!pathVersion.exists()) {
+			_EXCEPTION1("Damaged local repo.  Path \"%s\" does not exist in repo, "
+				"but is referenced in dataset metadata.  Try running \"repair\" on repo.",
+				pathVersion.str().c_str());
+		}
+
+		if (!pathDataset.is_directory()) {
+			_EXCEPTION1("Damaged local repo.  Path \"%s\" is not a directory, "
+				"but is referenced in dataset metadata.  Try running \"repair\" on repo.",
+				pathVersion.str().c_str());
+		}
+
+		// Execute removal of version directory
+		std::string strCommand =
+			std::string("rm -rf ") + pathVersion.str();
+		if (fVerbose) printf("Executing \"%s\"\n", strCommand.c_str());
+		if (strCommand.length() < pathRepo.str().length() + 6) {
+			_EXCEPTIONT("Failsafe triggered:  For safety reasons, "
+				"aborting execution of command.");
+		}
+
+		int iResult = std::system(strCommand.c_str());
+		if (iResult != 0) {
+			_EXCEPTIONT("Command failed.  Aborting.");
+		}
+	}
+
+	/////////////////////////////////////////////////////////////////////////////
+	// If these commands trigger an exception we've likely corrupted the repo
+	try {
+		// Write updated repo metadata
+		if (strDatasetVersion == "") {
+			filesystem::path pathRepoMetaJSON = pathRepo/filesystem::path("repo.txt");
+			if (fVerbose) printf("Writing repo metadata to \"%s\" (contains %lu datasets)\n",
+				pathRepoMetaJSON.str().c_str(), admlocalrepo.num_datasets());
+			admlocalrepo.to_file(pathRepoMetaJSON.str());
+		}
+
+		// Write updated dataset metadata
+		if (strDatasetVersion != "") {
+			filesystem::path pathDatasetMetaJSON = pathDataset/filesystem::path("dataset.txt");
+			if (fVerbose) printf("Writing dataset metadata to \"%s\" (contains %lu versions)\n",
+				pathDatasetMetaJSON.str().c_str(),
+				admlocaldataset.num_versions());
+			admlocaldataset.to_file(pathDatasetMetaJSON.str());
+		}
+
+	} catch(Exception & e) {
+		printf("DANGER: Exception may have corrupted repository.  "
+			"Run \"validate\" to check.\n");
+		throw std::runtime_error(e.ToString());
+
+	} catch(std::runtime_error & e) {
+		printf("DANGER: Exception may have corrupted repository.  "
+			"Run \"validate\" to check.\n");
+		throw e;
+
+	} catch(...) {
+		printf("DANGER: Exception may have corrupted repository.  "
+			"Run \"validate\" to check.\n");
+		throw std::runtime_error("Unknown exception");
+	}
+
+	// Success
+	printf("Dataset \"%s\" removed successfully\n", strDataset.c_str());
 
 	return 0;
 }
@@ -606,27 +808,14 @@ int adm_get(
 		_EXCEPTIONT("Missing dataset name\n");
 	}
 
+	// Output arguments
+	printf("Local repo \"%s\"\n", strLocalRepo.c_str());
+	printf("Server \"%s\"\n", strServer.c_str());
+
 	// Break up dataset into name and version
 	std::string strDatasetName;
 	std::string strDatasetVersion;
-	for (int i = 0; i < strDataset.length(); i++) {
-		if (strDataset[i] == '/') {
-			if ((strDatasetName != "") || (strDatasetVersion != "")) {
-				_EXCEPTIONT("Multiple forward-slash characters in dataset specifier\n");
-			}
-			if (i == 0) {
-				_EXCEPTIONT("Missing dataset name\n");
-			}
-			if (i == strDataset.length()-1) {
-				_EXCEPTIONT("Missing dataset version\n");
-			}
-			strDatasetName = strDataset.substr(0, i-1);
-			strDatasetVersion = strDataset.substr(i+1);
-		}
-	}
-	if (strDatasetName == "") {
-		strDatasetName = strDataset;
-	}
+	get_dataset_name_version(strDataset, strDatasetName, strDatasetVersion);
 
 	// Path to repo
 	filesystem::path pathRepo = filesystem::path(strLocalRepo);
@@ -651,34 +840,42 @@ int adm_get(
 	// Verify requested dataset exists in the repository
 	int iServerDataset = admserver.find_dataset(strDatasetName);
 	if (iServerDataset == (-1)) {
-		_EXCEPTION1("Dataset \"%s\" not found on remote server\n",
-			strDataset.c_str());
+		printf("Dataset \"%s\" not found on remote server\n",
+			strDatasetName.c_str());
+		return 1;
 	}
 
 	// Load dataset descriptor from remote data server
 	AutodatamanRepoDatasetMD admserverdataset;
-	admserverdataset.from_server(strServer, strDataset, fVerbose);
+	admserverdataset.from_server(strServer, strDatasetName, fVerbose);
 
 	// Use default version number, if not specified
 	if (strDatasetVersion == "") {
 		strDatasetVersion = admserverdataset.get_default_version();
 		if (strDatasetVersion == "") {
-			_EXCEPTION1("No default version of dataset \"%s\" available on server",
-				strDatasetName.c_str());
+			printf("No default version of dataset \"%s\" found. "
+				"Please specify a version:\n", strDatasetName.c_str());
+			const std::vector<std::string> & vecVersions =
+				admserverdataset.get_version_names();
+			for (size_t i = 0; i < vecVersions.size(); i++) {
+				printf("  %s\n", vecVersions[i].c_str());
+			}
+			return 1;
 		}
-		printf("Default dataset version \"%s\"\n", strDatasetVersion.c_str());
+		printf("Default dataset version is \"%s\".\n", strDatasetVersion.c_str());
 	}
 
 	// Verify requested version exists in the repository
 	int iServerVersion = admserverdataset.find_version(strDatasetVersion);
 	if (iServerVersion == (-1)) {
-		_EXCEPTION1("Version \"%s\" not found on remote server\n",
-			strDatasetVersion.c_str());
+		printf("Dataset \"%s\" version \"%s\" not found on remote server.\n",
+			strDatasetName.c_str(), strDatasetVersion.c_str());
+		return 1;
 	}
 
 	// Download data descriptor from remote data server
 	AutodatamanRepoDataMD admserverdata;
-	admserverdata.from_server(strServer, strDataset, strDatasetVersion, fVerbose);
+	admserverdata.from_server(strServer, strDatasetName, strDatasetVersion, fVerbose);
 
 	// Load repository descriptor from local data server
 	AutodatamanRepoMD admlocalrepo;
@@ -777,7 +974,7 @@ int adm_get(
 
 			// Check for equivalence
 			if (admserverdata == admlocaldata) {
-				printf("Specified dataset \"%s\" already exists on local repo.  ",
+				printf("Specified dataset \"%s\" already exists on local repo.\n",
 					strDataset.c_str());
 
 				if (!fForceOverwrite) {
@@ -865,12 +1062,14 @@ int adm_get(
 			}
 			std::vector<unsigned char> vecsha(picosha2::k_digest_size);
 			picosha2::hash256(ifDownload, vecsha.begin(), vecsha.end());
-			std::string strSHA256 = picosha2::bytes_to_hex_string(vecsha.begin(), vecsha.end());
+			std::string strSHA256 =
+				picosha2::bytes_to_hex_string(vecsha.begin(), vecsha.end());
 
 			if (strSHA256 != admlocalfile.get_sha256sum()) {
 				printf("Repository SHA256 %s\n", admlocalfile.get_sha256sum().c_str());
 				_EXCEPTION2("ERROR: Failed to verify file SHA256. If local data "
-					"repository is inconsistent try \"remove %s/%s\" before downloading again.",
+					"repository is inconsistent try \"remove %s/%s\" before "
+					"downloading again.",
 					strDatasetName.c_str(), strDatasetVersion.c_str());
 			} else {
 				printf("Verified SHA256 %s\n", strSHA256.c_str());
@@ -920,9 +1119,6 @@ int adm_get(
 			printf("=============================================\n");
 		}
 
-		////////////////////////////////////////////////////
-		// Everything good so far
-
 	// Exception occurred; clean-up
 	} catch(Exception & e) {
 		strAbortText = e.ToString();
@@ -932,6 +1128,7 @@ int adm_get(
 		strAbortText = "Unknown exception";
 	}
 
+	////////////////////////////////////////////////////
 	// Cleanup if an exception occurs
 	if (strAbortText != "") {
 
@@ -967,6 +1164,7 @@ int adm_get(
 		throw std::runtime_error(strAbortText.c_str());
 	}
 
+	/////////////////////////////////////////////////////////////////////////////
 	// If these commands trigger an exception we've likely corrupted the repo
 	try {
 
@@ -1296,6 +1494,7 @@ int main(int argc, char **argv) {
 	if (strCommand == "remove") {
 		CommandLineFlagSpec spec;
 		spec["l"] = 1;
+		spec["a"] = 0;
 		spec["v"] = 0;
 
 		CommandLineFlagMap mapFlags;
@@ -1332,9 +1531,11 @@ int main(int argc, char **argv) {
 			}
 		}
 
+		bool fRemoveAll = (mapFlags.find("a") != mapFlags.end());
+
 		bool fVerbose = (mapFlags.find("v") != mapFlags.end());
 
-		return adm_remove(strLocalRepo, strDataset, fVerbose);
+		return adm_remove(strLocalRepo, strDataset, fRemoveAll, fVerbose);
 
 	}
 
