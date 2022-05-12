@@ -34,3 +34,5 @@
 # VIM files
 *.swp
 
+# Mac
+.DS_Store
