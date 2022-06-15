@@ -8,6 +8,9 @@ from pathlib import Path
 import subprocess
 import shutil
 import argparse
+import sys
+import os
+import requests
 
 class AutodatamanNamelist(Namelist.Namelist):
     def __init__(self): 
@@ -370,15 +373,15 @@ def adm_get(strServer, strLocalRepo, strDataset, fForceOverwrite, fVerbose):
     print("Server {0}".format(strServer))
 
     # Break up dataset into name and version
-    strDatasetName, strDatasetVersion = get_dataset_name_version(strDatset)
+    strDatasetName, strDatasetVersion = get_dataset_name_version(strDataset)
 
     # Path to repo
     if len(strLocalRepo) < 2:
         raise Exception("Invalid local repository name {0}".format(strLocalRepo))
     pathRepo = Path(strLocalRepo)
 
-    # Path to dataset
-    pathDataset = pathRepo / path(strDatasetName)
+    # Path to dataset locally
+    pathDataset = pathRepo / Path(strDatasetName)
 
     # Flag indicating that this is a new dataset
     fNewDataset = False
@@ -392,7 +395,7 @@ def adm_get(strServer, strLocalRepo, strDataset, fForceOverwrite, fVerbose):
 
     # Verify requested dataset exists in the repository
     iServerDataset = admserver.find_dataset(strDatasetName)
-    if iServerDataset is None:
+    if iServerDataset < 0:
         raise Exception("Dataset {0} not found on remote server".format(strDatasetName))
 
     # Load dataset descriptor from remote data server
@@ -413,18 +416,18 @@ def adm_get(strServer, strLocalRepo, strDataset, fForceOverwrite, fVerbose):
 
     # Verify requested version exists in the repository
     iServerVersion = admserverdataset.find_version(strDatasetVersion)
-    if iServerVersion is None:
+    if iServerVersion < 0:
         raise Exception("Dataset {0} version {1} not found on remote server.".format(strDatasetName,strDatasetVersion))
     
     # Download data descriptor from remote data server
-    admserverdata = AutodatamanRepoDatasetMD()
-    admserverdata.from_server(strServer, strDatasetName, strDatasetVersion)
+    admserverdata = AutodatamanRepoDataMD()
+    admserverdata.from_server(strServer, strDatasetName, strDatasetVersion, fVerbose)
 
     # Load repository descriptor from local data server
-    admlocalrepo = AutodatamanRepoDatasetMD()
-    admlocalrepo.from_local_repo(strLocalRepo, fVerbose)
+    admlocalrepo = AutodatamanRepoMD()
+    admlocalrepo.from_local_repo(strLocalRepo,fVerbose)
 
-    # Path to version
+    # Path to version locally
     pathVersion = pathDataset/strDatasetVersion
 
     # Path to directory storing downloaded data
@@ -441,7 +444,7 @@ def adm_get(strServer, strLocalRepo, strDataset, fForceOverwrite, fVerbose):
     # Catch all exceptions from here so we can clean up data directory
     try:
         # Dataset does not exist in local repository
-        if iLocalDataset is None:
+        if iLocalDataset < 0:
             # Check for existence of dataset directory
             if pathDataset.exists():
                 raise Exception("Damaged local repo. Path {0} already exists in repo".format(str(pathDataset)) + 
@@ -449,7 +452,6 @@ def adm_get(strServer, strLocalRepo, strDataset, fForceOverwrite, fVerbose):
             
             # Create dataset directory
             pathDataset.mkdir()
-
             # New dataset
             fNewDataset = True
 
@@ -475,11 +477,11 @@ def adm_get(strServer, strLocalRepo, strDataset, fForceOverwrite, fVerbose):
         
         #################################################
         # Check if version exists in the local repository
-        admlocaldata = AutodatamanRepoDatasetMD() # TODO: is admlocaldata typo??
+        admlocaldata = AutodatamanRepoDataMD()
         iLocalVersion = admlocaldataset.find_version(strDatasetVersion)
         
         # Version does not exist in dataset
-        if iLocalVersion is None:
+        if iLocalVersion < 0:
             # Check for existence of version directory
             if pathVersionTemp.exists():
                 raise Exception("Damaged local repo. Path {0} already exists in repo".format(str(pathVersionTemp)) + 
@@ -491,8 +493,7 @@ def adm_get(strServer, strLocalRepo, strDataset, fForceOverwrite, fVerbose):
         # Version exists in dataset
         else:
             # Load the local metadata file
-            admlocaldata.from_local_repo(
-                strLocalRepo, strDatasetName, strDatasetVersion, fVerbose)
+            admlocaldata.from_local_repo(strLocalRepo, strDatasetName, fVerbose)
             
             # Check for equivalence
             if admserverdata == admlocaldata:
@@ -504,7 +505,7 @@ def adm_get(strServer, strLocalRepo, strDataset, fForceOverwrite, fVerbose):
                     print("Overwriting with server data.")
             else:
                 print("== SERVER COPY ==============================")
-                admserverdata.summary()
+                admserverdata.summary() 
                 print("== LOCAL COPY ===============================")
                 admlocaldata.summary()
                 print("=============================================")
@@ -534,7 +535,7 @@ def adm_get(strServer, strLocalRepo, strDataset, fForceOverwrite, fVerbose):
         pathDataMetaJSON = pathVersionTemp/"data.json"
 
         if fVerbose:
-            print("Writing version metaata to \"{0}\"".format(str(pathDatasetMetaJSON)))
+            print("Writing version metaata to \"{0}\"".format(str(pathDataMetaJSON)))
 
         admlocaldata.to_file(str(pathDataMetaJSON))
 
@@ -543,9 +544,9 @@ def adm_get(strServer, strLocalRepo, strDataset, fForceOverwrite, fVerbose):
         print("=============================================")
         strRemoteFilePath = strServer
         assert len(strRemoteFilePath) > 0
-        strRemoteFilePath = os.path.join(strRemoteFilePath,strDatasetVersion,"")
+        strRemoteFilePath = os.path.join(strRemoteFilePath,strDatasetName,strDatasetVersion,"")
 
-        for i in enumerate(admlocaldata.numfiles()):
+        for i in range(0,admlocaldata.num_files()):
             admlocalfile = admlocaldata[i]
 
             strRemoteFile = strRemoteFilePath + admlocalfile.get_filename()
@@ -568,7 +569,7 @@ def adm_get(strServer, strLocalRepo, strDataset, fForceOverwrite, fVerbose):
             h = hashlib.sha256()
             b = bytearray(128*1024)
             mv = memoryview(b)
-            with open(strFile,"rb",buffering=0) as open_file:
+            with open(pathFile,"rb",buffering=0) as open_file:
                 for n in iter(lambda : open_file.readinto(mv),0):
                     h.update(mv[:n])
             strSHA256 = h.hexdigest()
@@ -589,7 +590,7 @@ def adm_get(strServer, strLocalRepo, strDataset, fForceOverwrite, fVerbose):
 
         # Apply system commands
         fHasOnDownload = False
-        for i in enumerate(admlocaldata.numfiles()):
+        for i in range(0,admlocaldata.num_files()):
             admlocalfile = admlocaldata[i]
             
             pathFile = pathVersionTemp/admlocalfile.get_filename()
@@ -612,16 +613,9 @@ def adm_get(strServer, strLocalRepo, strDataset, fForceOverwrite, fVerbose):
         if fHasOnDownload:
             print("=============================================")        
 
-    # Exception occurred; clean-up
-    except:
-        # TODO
-        # set strAbortText to something, or use some way to
-        # catch that there was an exception
-        pass
-    
     #################################
     # Cleanup if an exception occurs
-    if strAbortText != "": # or whatever check we use for exception
+    except Exception as e:
         if fNewDataset or fOverwriteVersion:
             print("Exception caused code to abort.  Cleaning up.")
         
@@ -631,13 +625,15 @@ def adm_get(strServer, strLocalRepo, strDataset, fForceOverwrite, fVerbose):
                 print("Removing {0}".format(str(pathDataset)))
                 shutil.rmtree(str(pathDataset))
         
-    # Remove version directory created earlier in this function
-    elif fOverwriteVersion:
-        if pathVersionTemp.exists():
-            print("Removing {0}".format(str(pathVersionTemp)))
-            shutil.rmtree(str(pathVersionTemp))
+        # Remove version directory created earlier in this function
+        elif fOverwriteVersion:
+            if pathVersionTemp.exists():
+                print("Removing {0}".format(str(pathVersionTemp)))
+                shutil.rmtree(str(pathVersionTemp))
 
-    # TODO: now throw the error
+        # Now throw the error
+        print("Error: ",e)
+        return
 
     ########################################################################
     # If these commands trigger an exception we've likely corrupted the repo
@@ -652,6 +648,7 @@ def adm_get(strServer, strLocalRepo, strDataset, fForceOverwrite, fVerbose):
         else:
             # Write updated dataset metadata
             if fVerbose:
+                pathDatasetMetaJSON = pathDataset/"dataset.json"
                 print("Writing dataset metadata to {0} (contains {1} version(s))".format(
                     str(pathDatasetMetaJSON),str(admlocaldataset.num_versions())))
                 admlocaldataset.to_file(str(pathDatasetMetaJSON))
@@ -663,11 +660,12 @@ def adm_get(strServer, strLocalRepo, strDataset, fForceOverwrite, fVerbose):
                 str(pathDataMetaJSON),str(admlocalrepo.num_datasets())
             ))
             admlocalrepo.to_file(str(pathRepoMetaJSON))
-    except:
-        pass
-        # TODO: If there's errors:
-        # print("DANGER: Exception may have corrupted repository.")
-        # print("        Run \"validate\" to check.")
+    except Exception as e:
+        # TODO: "validate" doesn't exist yet
+        print("DANGER: Exception may have corrupted repository.")
+        print("        Run \"validate\" to check.")
+        print("Error: ",e)
+        return
 
     # Success
     print("Dataset {0} retrieved successfully".format(strDataset))
