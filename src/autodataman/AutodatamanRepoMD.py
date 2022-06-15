@@ -211,6 +211,14 @@ class AutodatamanRepoDatasetMD:
         if fVerbose:
             print("Local dataset contains {0} versions(s).".format(num_versions()))
 
+    def summary(self):
+        """Print summary of dataset."""
+        print("Short name:        {0}".format(self.m_strShortName))
+        print("Long name:         {0}".format(self.m_strLongName))
+        print("Source:            {0}".format(self.m_strSource))
+        print("Default version:   {0}".format(self.m_strDefaultVersion))
+        print("Available versions: "+", ".join(self.m_vecDatasetVersions))
+
     def get_short_name(self):
         """Get the dataset short name."""
         return self.m_strShortName
