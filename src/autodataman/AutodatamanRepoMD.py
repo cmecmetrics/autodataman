@@ -70,9 +70,15 @@ class AutodatamanRepoMD:
             r = requests.get(strServerMetadata,allow_redirects=False)
         except requests.exceptions.RequestException as e:
             print("Problem encountered when requesting server metadata at {0}:".format(strServer))
-            raise SystemExit(e)
-
-        self.from_JSON(r.json())
+            raise Exception(e)
+        
+        if r.ok:
+            try:
+                self.from_JSON(r.json())
+            except requests.exceptions.JSONDecodeError:
+                raise Exception("Could not parse {0}.\nThe file repo.json may not exist or may be corrupted.".format(strServerMetadata))
+        else:
+            raise Exception("Status code "+str(r.status_code)+" in request for "+strServerMetadata)
 
         if fVerbose:
             print("Server contains {0} dataset(s)".format(self.num_datasets()))
@@ -82,8 +88,11 @@ class AutodatamanRepoMD:
         # Repo metadata
         strRepoMetadataPath = strRepoPath + "/repo.json"
 
-        with open(strRepoMetadataPath,"r") as ifs:
-            jmeta = json.load(ifs)
+        if Path(strRepoMetadataPath).exists():
+            with open(strRepoMetadataPath,"r") as ifs:
+                jmeta = json.load(ifs)
+        else:
+            raise FileNotFoundError(strRepoMetadataPath + " not found.")
         
         self.from_JSON(jmeta)
 
@@ -196,20 +205,29 @@ class AutodatamanRepoDatasetMD:
         # Download the metadata file from the server
         r = requests.get(strServerMetadata,allow_redirects=False)
 
-        self.from_JSON(r.json())
+        if r.ok:
+            try:
+                self.from_JSON(r.json())
+            except requests.exceptions.JSONDecodeError:
+                raise Exception("Could not parse {0}.\nThe file dataset.json may not exist or may be corrupted.".format(strServerMetadata))
+        else:
+            raise Exception("Status code "+str(r.status_code)+" in request for "+strServerMetadata)
 
     def from_local_repo(self,strRepoPath,strDataset,fVerbose):
         """Populate from local repository."""
         # Repo metadata
         strRepoMetadataPath = strRepoPath + "/" + strDataset + "/dataset.json"
 
-        with open(strRepoMetadataPath,"r") as ifs:
-            jmeta = json.load(ifs)
+        if Path(strRepoMetadataPath).exists():
+            with open(strRepoMetadataPath,"r") as ifs:
+                jmeta = json.load(ifs)
+        else:
+            raise FileNotFoundError(strRepoMetadataPath + " not found.")
         
         self.from_JSON(jmeta)
 
         if fVerbose:
-            print("Local dataset contains {0} versions(s).".format(num_versions()))
+            print("Local dataset contains {0} versions(s).".format(self.num_versions()))
 
     def summary(self):
         """Print summary of dataset."""
@@ -417,7 +435,13 @@ class AutodatamanRepoDataMD:
             print(strServerMetadata)
             print("=============================================")
 
-        self.from_JSON(r.json())
+        if r.ok:
+            try:
+                self.from_JSON(r.json())
+            except requests.exceptions.JSONDecodeError:
+                raise Exception("ERROR: Could not parse {0}.\nThe file data.json may not exist or may be corrupted.".format(strServerMetadata))
+        else:
+            raise Exception("Status code "+str(r.status_code)+" in request for "+strServerMetadata)
 
         if fVerbose:
             print("Local version contains {0} file(s).\n".format(self.num_files()))
@@ -426,8 +450,11 @@ class AutodatamanRepoDataMD:
         """Populate from local repository.""" 
         strRepoMetadataPath = strRepoPath + "/" + strDataset + "/" + strVersion + "/data.json"
 
-        with open(str(strRepoMetadataPath),"r") as ifs:
-            jmeta = json.load(ifs)
+        if Path(strRepoMetadataPath).exists():
+            with open(str(strRepoMetadataPath),"r") as ifs:
+                jmeta = json.load(ifs)
+        else:
+            raise FileNotFoundError(strRepoMetadataPath + " not found.")
 
         self.from_JSON(jmeta)
 

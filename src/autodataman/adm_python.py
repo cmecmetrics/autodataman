@@ -56,16 +56,22 @@ def get_dataset_name_version(strDataset):
         strDatasetVersion = ""
     return strDatasetName, strDatasetVersion
 
-def adm_getrepo_string(): 
+def adm_getrepo_string(validate = False): 
     nml = AutodatamanNamelist()
     nml.LoadFromUser()
     str_return = nml["default_local_repo"]
+    if validate:
+        if str_return is None:
+            raise Exception("The 'default_local_repo' is not set.\nUse 'autodataman setrepo <local_repo> to set.")
     return str_return
 
-def adm_getserver_string(): 
+def adm_getserver_string(validate=False): 
     nml = AutodatamanNamelist()
     nml.LoadFromUser()
     str_return = nml["default_server"]
+    if validate:
+        if str_return is None:
+            raise Exception("The 'default_server' is not set.\nUse 'autodataman setserver <server_name> to set.")
     return str_return
 
 def adm_config_get():
@@ -108,12 +114,12 @@ def adm_setrepo(strDir):
 
     # Check for existence of repo path
     if not pathRepo.exists():
-        raise FileNotFoundError("repo path {0} not found".format(strDir))
+        raise FileNotFoundError("Repo path {0} not found".format(strDir))
     
     # Verify directory is a valid repository
     pathRepoMeta = pathRepo/"repo.json"
     if not pathRepoMeta.exists():
-        raise FileNotFoundError("{0} is not a valid autodataman repo: Missing \"repo.json\" file".format(pathRepo))
+        raise Exception("The directory {0} is not a valid autodataman repo: Missing \"repo.json\" file".format(pathRepo))
     
     # Set this repository to be default in .autodataman
     nml = AutodatamanNamelist()
@@ -130,7 +136,11 @@ def adm_setserver(strServer):
     # Downlad the server listing
     print("Connecting to server {0}".format(strServer))
     admrepo = AutodatamanRepoMD()
-    admrepo.from_server(strServer)
+    try:
+        admrepo.from_server(strServer)
+    except:
+        raise Exception("Could not validate server {0}. ".format(strServer) + \
+            "To force, use 'autodataman config --variable default_server --value {0}'".format(strServer))
     print("Remote server contains {0} datasets".format(admrepo.num_datasets()))
 
     # Set this server to be default in .autodataman
@@ -142,7 +152,7 @@ def adm_setserver(strServer):
 def adm_getserver():
     # Report the name of the repository in .autodataman
     strServer = adm_getserver_string()
-    if strServer == "":
+    if strServer is None:
         print("No default autodataman server")
     else:
         print("Default autodataman server set to {0}".format(strServer))
@@ -186,42 +196,47 @@ def adm_list(strLocalRepo,fVerbose):
             print("    {0} (0 versions)".format(dataset))
 
 def adm_info(strServer, strLocalRepo, strDataset, fVerbose):
-    print("== SERVER COPY ==============================")
+    print("\n== SERVER COPY ==============================")
     print("Server {0}".format(strServer))
 
-    # Load repository metadata from remote data server
-    admserver = AutodatamanRepoMD()
-    admserver.from_server(strServer, fVerbose)
+    try:
+        # Load repository metadata from remote data server
+        admserver = AutodatamanRepoMD()
+        admserver.from_server(strServer, fVerbose)
 
-    # Verify requested dataset exists in the repository
-    iServerDataset = admserver.find_dataset(strDataset)
-    if iServerDataset is None:
-        print("Dataset {0} not found on remote server".format(strDataset))
-    else:
-        # Load dataset metadata from remote data server
-        admrepodataset = AutodatamanRepoDatasetMD()
-        admrepodataset.from_server(strServer, strDataset, fVerbose)
-
-        # Output information
-        print("Long name:  {0}".format(admrepodataset.get_long_name()))
-        print("Short name: {0}".format(admrepodataset.get_short_name()))
-        if len(admrepodataset.get_source()) != 0:
-            print("Source:      {0}".format(admrepodataset.get_source()))
+        # Verify requested dataset exists in the repository
+        iServerDataset = admserver.find_dataset(strDataset)
+        if iServerDataset is None:
+            print("Dataset {0} not found on remote server".format(strDataset))
         else:
-            print("Source:      (unknown)")
-        print("Version(s) available:")
+            # Load dataset metadata from remote data server
+            admrepodataset = AutodatamanRepoDatasetMD()
+            admrepodataset.from_server(strServer, strDataset, fVerbose)
 
-        # List available datasets
-        vecVersions = admrepodataset.get_version_names()
-        for item in vecVersions:
-            if item == admrepodataset.get_default_version():
-                print("  {0} [default]".format(item))
+            # Output information
+            print("Long name:  {0}".format(admrepodataset.get_long_name()))
+            print("Short name: {0}".format(admrepodataset.get_short_name()))
+            if len(admrepodataset.get_source()) != 0:
+                print("Source:      {0}".format(admrepodataset.get_source()))
             else:
-                print("   {0}".format(item))
+                print("Source:      (unknown)")
+            print("Version(s) available:")
 
-        print("== LOCAL COPY ===============================")
-        print("Local repo {0}".format(strLocalRepo))
+            # List available datasets
+            vecVersions = admrepodataset.get_version_names()
+            for item in vecVersions:
+                if item == admrepodataset.get_default_version():
+                    print("  {0} [default]".format(item))
+                else:
+                    print("   {0}".format(item))
+    except Exception as e:
+        print("\nThe following error occurred while attempting\nto access server repository information:")
+        print(e)
 
+    print("\n== LOCAL COPY ===============================")
+    print("Local repo {0}".format(strLocalRepo))
+
+    try:
         # Load repository metadata from local data server
         admlocal = AutodatamanRepoMD()
         admlocal.from_local_repo(strLocalRepo, fVerbose)
@@ -252,7 +267,10 @@ def adm_info(strServer, strLocalRepo, strDataset, fVerbose):
                     print("  {0}".item)
             if len(vecVersions) == 0:
                 print("  (none)")
-            print("=============================================")
+    except Exception as e:
+        print("\nThe following error occurred while attempting\nto access local repository information:")
+        print(e)
+    print("=============================================")
 
 def adm_remove(strLocalRepo,strDataset,fVerbose):
     # Check arguments
@@ -681,52 +699,51 @@ def main():
     subparsers = parser.add_subparsers(dest="command")
     
     # Config
-    parser_config = subparsers.add_parser("config", help="Usage: adm config [<variable> <value>]")
+    parser_config = subparsers.add_parser("config", help="Usage: autodataman config [<variable> <value>]")
     parser_config.add_argument("--variable",type=str,help="variable")
     parser_config.add_argument("--value",type=str,help="value")
 
     # Initiate Repo
-    parser_initrepo = subparsers.add_parser("initrepo",help="Usage: adm initrepo <local repo dir>")
+    parser_initrepo = subparsers.add_parser("initrepo",help="Usage: autodataman initrepo <local repo dir>")
     parser_initrepo.add_argument("local",type=str,help="directory")
 
     # Set Repo
-    parser_setrepo = subparsers.add_parser("setrepo",help="Usage: adm initrepo <local repo dir>")
+    parser_setrepo = subparsers.add_parser("setrepo",help="Usage: autodataman initrepo <local repo dir>")
     parser_setrepo.add_argument("local",type=str,help="directory")
 
     # Set Server
-    parser_setserver = subparsers.add_parser("setserver",help="Usage: %s setserver <remote server>")
+    parser_setserver = subparsers.add_parser("setserver",help="Usage: autodataman setserver <remote server>")
     parser_setserver.add_argument("server",type=str,help="server")
 
     # Avail
-    parser_avail = subparsers.add_parser("avail",help="Usage: %s avail [-s <server>]")
+    parser_avail = subparsers.add_parser("avail",help="Usage: autodataman avail [-s <server>]")
     parser_avail.add_argument("--server","-s",type=str,help="server")
     parser_avail.add_argument("--verbose","-v",action="store_true")
 
     # Info
-    parser_info = subparsers.add_parser("info",help="Usage: %s info [-v] [-l <local repo dir>] [-s <server>] <dataset id>")
+    parser_info = subparsers.add_parser("info",help="Usage: autodataman info [-v] [-l <local repo dir>] [-s <server>] <dataset id>")
     parser_info.add_argument("dataset",help="dataset id",type=str)
-    parser_info.add_argument("--server","-s",help="server")
-    parser_info.add_argument("--local","-l",help="local repository")
+    parser_info.add_argument("--server","-s",help="server",default=None)
+    parser_info.add_argument("--local","-l",help="local repository",default=None)
     parser_info.add_argument("--verbose","-v",help="increase verbosity",action="store_true")
 
     # List
-    parser_list = subparsers.add_parser("list",help="Usage: %s list [-l <local repo dir>]")
-    parser_list.add_argument("--local","-l",help="local repository")
+    parser_list = subparsers.add_parser("list",help="Usage: autodataman list [-l <local repo dir>]")
+    parser_list.add_argument("--local","-l",type=str,help="local repository")
     parser_list.add_argument("--verbose","-v",help="increase verbosity",action="store_true")
 
     # Remove
-    parser_remove = subparsers.add_parser("remove",help="Usage: %s remove [-v] [-l <local repo dir>] <dataset id>[/<version>]")
+    parser_remove = subparsers.add_parser("remove",help="Usage: autodataman remove [-v] [-l <local repo dir>] <dataset id>[/<version>]")
     parser_remove.add_argument("dataset",help="dataset id",type=str)
-    parser_remove.add_argument("--server","-s",help="server")
-    parser_remove.add_argument("--local","-l",help="local repository")
+    parser_remove.add_argument("--local","-l",type=str,help="local repository")
     parser_remove.add_argument("--verbose","-v",help="increase verbosity")
     parser_remove.add_argument("--all","-a",help="remove all",action="store_true")
 
     # Get
-    parser_get = subparsers.add_parser("get",help="Usage: %s get [-f] [-v] [-l <local repo dir>] [-s <server>] <dataset id>[/<version>]")
+    parser_get = subparsers.add_parser("get",help="Usage: autodataman get [-f] [-v] [-l <local repo dir>] [-s <server>] <dataset id>[/<version>]")
     parser_get.add_argument("dataset",help="dataset id",type=str)
-    parser_get.add_argument("--server","-s",help="server")
-    parser_get.add_argument("--local","-l",help="local repository")
+    parser_get.add_argument("--server","-s",type=str,help="server")
+    parser_get.add_argument("--local","-l",type=str,help="local repository")
     parser_get.add_argument("--verbose","-v",help="increase verbosity")
     parser_get.add_argument("--force","-f",help="force overwrite",action="store_true")
 
@@ -738,12 +755,14 @@ def main():
 
     # Configure
     if strCommand == "config":
-        if "variable" in args:
+        if args.variable is not None:
+            if args.value is None:
+                raise Exception("The --value flag must be set when the --variable flag is set.")
             strVariable = args.variable
             strValue = args.value
-            return adm_config_set(strVariable,strValue)
+            adm_config_set(strVariable,strValue)
         else:
-            return adm_config_get()
+            adm_config_get()
 
     # Initialize a repository directory with no content 
     if strCommand == "initrepo":
@@ -770,45 +789,44 @@ def main():
 
     # Check for data available
     if strCommand == "avail":
-        strRemoteServer = args.server
-        strRemoteServer = adm_getserver_string()
+        if args.server is not None:
+            strRemoteServer = args.server
+        else:
+            strRemoteServer = adm_getserver_string(validate=True)
         fVerbose = args.verbose
         return adm_avail(strRemoteServer,fVerbose)
 
     # Check for data information
     if strCommand == "info":
         strDataset = args.dataset
-        if "server" in args:
+        if args.server is not None:
             strRemoteServer = args.server
         else:
-            strRemoteServer = adm_getserver_string()
-        if "local" in args:
+            strRemoteServer = adm_getserver_string(validate=True)
+        if args.local is not None:
             strLocalRepo = args.local
         else:
-            strLocalRepo = adm_getrepo_string()
+            strLocalRepo = adm_getrepo_string(validate=True)
         fVerbose = args.verbose
         return adm_info(strRemoteServer, strLocalRepo, strDataset, fVerbose)
 
     # Check for data on the local repository
     if strCommand == "list":
-        if "local" in args:
+        if args.local is not None:
             strLocalRepo = args.local
         else:
-            strLocalRepo = adm_getrepo_string()
+            strLocalRepo = adm_getrepo_string(validate=True)
+            print("Using default local repository '" + strLocalRepo + "'.")
         fVerbose = args.verbose
         return adm_list(strLocalRepo, fVerbose)
 
     # Remove data from the local repository
     if strCommand == "remove":
         strDataset = args.dataset
-        if "server" in args:
-            strRemoteServer = args.server
-        else:
-            strRemoteServer = adm_getserver_string()
-        if "local" in args:
+        if args.local is not None:
             strLocalRepo = args.local
         else:
-            strLocalRepo = adm_getrepo_string()
+            strLocalRepo = adm_getrepo_string(validate=True)
         fRemoveAll = args.all
         fVerbose = args.verbose
         return adm_remove(strLocalRepo,strDataset,fRemoveAll,fVerbose)
@@ -816,22 +834,22 @@ def main():
     # Get data from the remote repository and store in the local repository 
     if strCommand == "get":
         strDataset = args.dataset
-        if "server" in args:
+        if args.server is not None:
             strRemoteServer = args.server
         else:
-            strRemoteServer = adm_getserver_string()
-        if "local" in args:
+            strRemoteServer = adm_getserver_string(validate=True)
+        if args.local is not None:
             strLocalRepo = args.local
         else:
-            strLocalRepo = adm_getrepo_string()
+            strLocalRepo = adm_getrepo_string(validate=True)
         fForceOverwrite = args.force
         fVerbose = args.verbose
 
         return adm_get(strRemoteServer, strLocalRepo, strDataset, fForceOverwrite, fVerbose)
 
     # Put data on the server
-    if strCommand == "put":
-        pass
+    #if strCommand == "put":
+    #    pass
 
 if __name__ == "__main__":
     main()
