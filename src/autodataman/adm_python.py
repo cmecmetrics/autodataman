@@ -345,13 +345,13 @@ def adm_remove(strLocalRepo,strDataset,fVerbose):
         if strDatasetVersion == "":
             pathRepoMetaJSON = pathRepo/"repo.json"
             if fVerbose:
-                print("Writing repo metadata to {0} (contains {1} datasets)".format(pathRepoMetaJSON,admlocalrepo.num_datasets()))
+                print("Writing repo metadata to {0} (contains {1} datasets)".format(str(pathRepoMetaJSON),admlocalrepo.num_datasets()))
             admlocalrepo.to_file(str(pathRepoMetaJSON))
         # Write updated dataset metadata
         if strDatasetVersion !=  "":
             pathDatasetMetaJSON = pathDataset/"dataset.json"
             if fVerbose:
-                print("Writing dataset metadata to {0} (containts {1} versions)".format(str(pathDatasetMetaJSON,admlocaldataset.num_versions())))
+                print("Writing dataset metadata to {0} (containts {1} versions)".format(str(pathDatasetMetaJSON),admlocaldataset.num_versions()))
             admlocaldataset.to_file(str(pathDatasetMetaJSON))
     except:
         raise RuntimeError("DANGER: Exception may have corrupted repository.\nRun \"validate\" to check.")
@@ -647,11 +647,11 @@ def adm_get(strServer, strLocalRepo, strDataset, fForceOverwrite, fVerbose):
             shutil.move(str(pathVersionTemp),str(pathVersion))
         else:
             # Write updated dataset metadata
+            pathDatasetMetaJSON = pathDataset/"dataset.json"
             if fVerbose:
-                pathDatasetMetaJSON = pathDataset/"dataset.json"
                 print("Writing dataset metadata to {0} (contains {1} version(s))".format(
                     str(pathDatasetMetaJSON),str(admlocaldataset.num_versions())))
-                admlocaldataset.to_file(str(pathDatasetMetaJSON))
+            admlocaldataset.to_file(str(pathDatasetMetaJSON))
         
         # Write updated repo metadata
         if fNewDataset:
@@ -663,7 +663,7 @@ def adm_get(strServer, strLocalRepo, strDataset, fForceOverwrite, fVerbose):
     except Exception as e:
         # TODO: "validate" doesn't exist yet
         print("DANGER: Exception may have corrupted repository.")
-        print("        Run \"validate\" to check.")
+        #print("        Run \"validate\" to check.")
         print("Error: ",e)
         return
 

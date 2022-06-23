@@ -524,11 +524,15 @@ def test_adm_info(requests_mock,monkeypatch,capfd):
         # Check that something got printed
         assert len(out) > 1
 
-@pytest.fixture(scope='function')
-def setup_teardown_test_repo(request):
+def adm_remove_directory_variables():
         strLocalRepo = "test_repo"
         strDataset = "test_dataset_remove"
         strVersion = "v1"
+        return strLocalRepo, strDataset, strVersion
+
+@pytest.fixture(scope='function')
+def setup_teardown_test_repo(request):
+        strLocalRepo, strDataset, strVersion = adm_remove_directory_variables()
         dir_path = os.path.join(strLocalRepo,strDataset,strVersion)
         Path(dir_path).mkdir(parents=True)
         with open(strLocalRepo+"/"+strDataset+"/dataset.json","w") as ofs:
@@ -545,10 +549,7 @@ def setup_teardown_test_repo(request):
 
 def test_adm_remove_dataset(setup_teardown_test_repo):
         """Test adm_remove, which removes a dataset."""
-        # TODO: Don't duplicate these variables in the test and the fixture
-        strLocalRepo = "test_repo"
-        strDataset = "test_dataset_remove"
-        strVersion = "v1"
+        strLocalRepo, strDataset, strVersion = adm_remove_directory_variables()
         dir_path = os.path.join(strLocalRepo,strDataset,strVersion)
 
         adm_remove(strLocalRepo,strDataset,False)
@@ -558,10 +559,7 @@ def test_adm_remove_dataset(setup_teardown_test_repo):
 
 def test_adm_remove_version(setup_teardown_test_repo):
         """Test adm_remove, which removes a version from a dataset."""
-        # TODO: Don't duplicate these variables in the test and the fixture
-        strLocalRepo = "test_repo"
-        strDataset = "test_dataset_remove"
-        strVersion = "v1"
+        strLocalRepo, strDataset, strVersion = adm_remove_directory_variables()
         dir_path = os.path.join(strLocalRepo,strDataset,strVersion)
 
         adm_remove(strLocalRepo,strDataset+"/"+strVersion,False)
@@ -589,8 +587,8 @@ def setup_teardown_adm_get(request):
                                 json.dump(jmeta, ofs, indent=4)
         request.addfinalizer(teardown_directory)
 
-def test_adm_get(requests_mock,monkeypatch,capfd,setup_teardown_adm_get):
-        # Test the adm_get function
+def test_adm_get_version(requests_mock,monkeypatch,setup_teardown_adm_get):
+        """Test the adm_get function with version specified and verbose."""
         
         # Setup test home directory
         def mockreturn():
@@ -606,43 +604,113 @@ def test_adm_get(requests_mock,monkeypatch,capfd,setup_teardown_adm_get):
         strVersion = "v1"
         strDataset = "test_dataset_2"
         fVerbose = True
-        fForceOverwrite = False
+        fForceOverwrite = True
 
-        # mock repo.json
+        # mock repo.json using data from local repo
         remote_repo_path = strRemoteRepo+"/repo.json"
         with open(remote_repo_path,"r") as ifs:
                 mock_dict = json.load(ifs)
         requests_mock.get(strServer+"/repo.json",json=mock_dict)
 
-        # mock data.json
+        # mock data.json using data from local repo
         remote_data_path = strRemoteRepo+"/"+strDataset+"/"+strVersion+"/data.json"
         with open(remote_data_path,"r") as ifs:
                 mock_dict = json.load(ifs)
         requests_mock.get(strServer+"/"+strDataset+"/"+strVersion+"/data.json",json=mock_dict)
 
-        # mock dataset.json
+        # mock dataset.json using data from local repo
         remote_dataset_path = strRemoteRepo+"/"+strDataset+"/dataset.json"
         with open(remote_dataset_path,"r") as ifs:
                 mock_dict = json.load(ifs)
         requests_mock.get(strServer+"/"+strDataset+"/dataset.json",json=mock_dict)
 
-        # mock test dataset
+        # mock test dataset using data from local repo
         remote_data_path = strRemoteRepo +"/"+strDataset+"/" + strVersion + "/test_file_2.nc"
         with open(remote_data_path,"rb") as infile:
                 mock_data = infile.read()
         mock_server_path = strServer+"/"+strDataset+"/" + strVersion + "/test_file_2.nc"
         requests_mock.get(mock_server_path,content=mock_data)
 
+        # Running adm_get with a dataet and version provided
         adm_get(strServer, strLocalRepo, strDataset+"/v1", fForceOverwrite, fVerbose)
 
-        # Check that data file exists
+        # Check that data file exists in destination repo
         local_data_path = strLocalRepo +"/"+strDataset+"/" + strVersion + "/test_file_2.nc"
         assert os.path.exists(local_data_path)
 
-        # Check that data.json exists
+        # Check that data.json exists in destination repo
         local_version_path = strLocalRepo +"/"+strDataset+"/" + strVersion + "/data.json"
         assert os.path.exists(local_version_path)
 
-        # Check that dataset.json exists
+        # Check that dataset.json exists in destination repo
         local_dataset_path = strLocalRepo +"/"+strDataset+"/dataset.json"
         assert os.path.exists(local_dataset_path)
+
+        # Check that destination repo.json was updated
+        with open("test_repo/repo.json","r") as ifs:
+                jmeta = json.load(ifs)
+        assert "test_dataset_2" in jmeta["_DATASETS"]
+
+def test_adm_get_dataset(requests_mock,monkeypatch,setup_teardown_adm_get):
+        """Test the adm_get function using just a dataset argument."""
+        
+        # Setup test home directory
+        def mockreturn():
+                return Path("test_home_read")
+        monkeypatch.setattr(Path, "home", mockreturn)
+
+        # Set up test localrepo
+        strLocalRepo = "test_repo"
+        strRemoteRepo = "test_remote_repo"
+
+        # Set up test strserver
+        strServer="http://test_admrepo_from_server.com"
+        strVersion = "v1"
+        strDataset = "test_dataset_2"
+        fVerbose = False
+        fForceOverwrite = False
+
+        # mock repo.json using data from local repo
+        remote_repo_path = strRemoteRepo+"/repo.json"
+        with open(remote_repo_path,"r") as ifs:
+                mock_dict = json.load(ifs)
+        requests_mock.get(strServer+"/repo.json",json=mock_dict)
+
+        # mock data.json using data from local repo
+        remote_data_path = strRemoteRepo+"/"+strDataset+"/"+strVersion+"/data.json"
+        with open(remote_data_path,"r") as ifs:
+                mock_dict = json.load(ifs)
+        requests_mock.get(strServer+"/"+strDataset+"/"+strVersion+"/data.json",json=mock_dict)
+
+        # mock dataset.json using data from local repo
+        remote_dataset_path = strRemoteRepo+"/"+strDataset+"/dataset.json"
+        with open(remote_dataset_path,"r") as ifs:
+                mock_dict = json.load(ifs)
+        requests_mock.get(strServer+"/"+strDataset+"/dataset.json",json=mock_dict)
+
+        # mock test dataset using data from local repo
+        remote_data_path = strRemoteRepo +"/"+strDataset+"/" + strVersion + "/test_file_2.nc"
+        with open(remote_data_path,"rb") as infile:
+                mock_data = infile.read()
+        mock_server_path = strServer+"/"+strDataset+"/" + strVersion + "/test_file_2.nc"
+        requests_mock.get(mock_server_path,content=mock_data)
+
+        # Running adm_get with a dataset only provided
+        adm_get(strServer, strLocalRepo, strDataset, fForceOverwrite, fVerbose)
+
+        # Check that data file exists in destination repo
+        local_data_path = strLocalRepo +"/"+strDataset+"/" + strVersion + "/test_file_2.nc"
+        assert os.path.exists(local_data_path)
+
+        # Check that data.json exists in destination repo
+        local_version_path = strLocalRepo +"/"+strDataset+"/" + strVersion + "/data.json"
+        assert os.path.exists(local_version_path)
+
+        # Check that dataset.json exists in destination repo
+        local_dataset_path = strLocalRepo +"/"+strDataset+"/dataset.json"
+        assert os.path.exists(local_dataset_path)
+
+        # Check that destination repo.json was updated
+        with open("test_repo/repo.json","r") as ifs:
+                jmeta = json.load(ifs)
+        assert "test_dataset_2" in jmeta["_DATASETS"]

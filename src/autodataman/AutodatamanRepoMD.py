@@ -80,9 +80,9 @@ class AutodatamanRepoMD:
     def from_local_repo(self,strRepoPath,fVerbose=False):
         """Populate from local repository."""
         # Repo metadata
-        strRepoMetadataPath = Path(strRepoPath)/"repo.json"
+        strRepoMetadataPath = strRepoPath + "/repo.json"
 
-        with open(str(strRepoMetadataPath),"r") as ifs:
+        with open(strRepoMetadataPath,"r") as ifs:
             jmeta = json.load(ifs)
         
         self.from_JSON(jmeta)
@@ -201,7 +201,7 @@ class AutodatamanRepoDatasetMD:
     def from_local_repo(self,strRepoPath,strDataset,fVerbose):
         """Populate from local repository."""
         # Repo metadata
-        strRepoMetadataPath = str(Path(strRepoPath)/Path(strDataset)/"dataset.json")
+        strRepoMetadataPath = strRepoPath + "/" + strDataset + "/dataset.json"
 
         with open(strRepoMetadataPath,"r") as ifs:
             jmeta = json.load(ifs)
