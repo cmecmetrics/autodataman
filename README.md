@@ -45,6 +45,3 @@ Remove a dataset from the local data server.
 autodataman get [-f] [-v] [-l \<local repo dir\>]  [-s \<server\>] \<dataset id\>[/\<version\>]  
 Get the specified dataset from the remote data server and store it on the local data repo or remote server.
 
-autodataman put [-l \<local repo dir\>] [-s \<server\>] [-c \<compression type\>] \<dataset dir\>/\<version\>  
-Put the specified dataset into the local repository or remote server.
-
