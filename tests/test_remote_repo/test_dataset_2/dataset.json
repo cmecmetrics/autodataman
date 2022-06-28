@@ -1,0 +1,8 @@
+{
+    "_DATASET": {
+            "short_name": "test_2",
+            "long_name": "test_dataset_2",
+            "default": "v1"
+    },
+    "_VERSIONS": ["v1"]
+}

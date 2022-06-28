@@ -1,0 +1,9 @@
+{
+    "_REPO": {
+        "type": "autodataman",
+        "version": "1"
+    },
+    "_DATASETS": [
+        "test_dataset_1", "test_dataset_2"
+    ]
+}
