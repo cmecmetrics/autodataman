@@ -24,7 +24,7 @@ pip install .
 The requests library is a dependency that must also be installed in your existing environment.
 
 ## Command line
-The following command line options are available as part of the tool.
+The following command line options are available as part of the tool. The alias "adm" can be used in place of "autodataman" for brevity.
 
 autodataman config [\<variable\> \<value\>]  
 Set the specified configuration variable to the given value.
