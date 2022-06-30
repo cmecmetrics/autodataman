@@ -23,6 +23,17 @@ pip install .
 
 The requests library is a dependency that must also be installed in your existing environment.
 
+### Install and test
+Clone the autodataman repository and enter the repository. With conda active, run the following commands to create a new autodataman test environment:
+```
+conda create -n adm_dev -c conda-forge python=3.7 requests pytest
+conda activate adm_dev
+pip install .
+pip install requests-mock
+```
+
+To run tests, enter the "tests" repository and run `pytest`.
+
 ## Command line
 The following command line options are available as part of the tool. The alias "adm" can be used in place of "autodataman" for brevity.
 
