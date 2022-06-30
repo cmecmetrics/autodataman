@@ -6,12 +6,12 @@ import sys
 from pathlib import Path
 import shutil
 
-proj_path = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, proj_path + "/../src/autodataman/")
+#proj_path = os.path.dirname(os.path.abspath(__file__))
+#sys.path.insert(0, proj_path + "/../autodataman/")
 
-from AutodatamanRepoMD import AutodatamanRepoMD, AutodatamanRepoDatasetMD, AutodatamanRepoFileMD, AutodatamanRepoDataMD
-from Namelist import Namelist
-from adm_python import AutodatamanNamelist, get_dataset_name_version, adm_getrepo_string, adm_getserver_string, adm_config_get, \
+from autodataman.AutodatamanRepoMD import AutodatamanRepoMD, AutodatamanRepoDatasetMD, AutodatamanRepoFileMD, AutodatamanRepoDataMD
+from autodataman.Namelist import Namelist
+from autodataman.autodataman import AutodatamanNamelist, get_dataset_name_version, adm_getrepo_string, adm_getserver_string, adm_config_get, \
 adm_config_set, adm_initrepo, adm_setrepo, adm_getrepo, adm_setserver, adm_getserver, adm_avail, adm_list, \
 adm_info, adm_remove, adm_get
 
