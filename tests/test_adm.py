@@ -548,21 +548,23 @@ def setup_teardown_test_repo(request):
         request.addfinalizer(teardown_directory)
 
 def test_adm_remove_dataset(setup_teardown_test_repo):
-        """Test adm_remove, which removes a dataset."""
+        """Test adm_remove, which removes a dataset.
+        fVerbose and fRemoveAll are set to False."""
         strLocalRepo, strDataset, strVersion = adm_remove_directory_variables()
         dir_path = os.path.join(strLocalRepo,strDataset,strVersion)
 
-        adm_remove(strLocalRepo,strDataset,False)
+        adm_remove(strLocalRepo,strDataset,False,False)
 
         assert os.path.exists(os.path.join(strLocalRepo,strDataset)) == False
         assert os.path.exists(dir_path) == False
 
 def test_adm_remove_version(setup_teardown_test_repo):
-        """Test adm_remove, which removes a version from a dataset."""
+        """Test adm_remove, which removes a version from a dataset.
+        fVerbose and fRemoveAll are set to False."""
         strLocalRepo, strDataset, strVersion = adm_remove_directory_variables()
         dir_path = os.path.join(strLocalRepo,strDataset,strVersion)
 
-        adm_remove(strLocalRepo,strDataset+"/"+strVersion,False)
+        adm_remove(strLocalRepo,strDataset+"/"+strVersion,False,False)
 
         # In this case, the version directory should be deleted, but not
         # the dataset directory
