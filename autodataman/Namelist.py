@@ -1,3 +1,7 @@
+#
+# Define namelist class
+#
+
 from pathlib import Path
 import json
 

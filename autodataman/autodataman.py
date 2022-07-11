@@ -1,4 +1,8 @@
 #!/bin/env/python
+#
+# main script for autodataman
+# Based on original code by Paul Ullrich
+# 
 
 from autodataman.AutodatamanRepoMD import AutodatamanRepoMD, AutodatamanRepoDatasetMD, AutodatamanRepoFileMD, AutodatamanRepoDataMD
 import autodataman.Namelist as Namelist

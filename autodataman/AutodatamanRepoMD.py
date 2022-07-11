@@ -1,3 +1,7 @@
+#
+# Define autodataman repository and file classes
+#
+
 from pathlib import Path
 import json
 import requests
