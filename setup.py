@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 from setuptools import find_packages, setup
-import subprocess
-import os
 
 packages=find_packages()
 
