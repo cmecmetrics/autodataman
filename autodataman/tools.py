@@ -6,20 +6,18 @@ def download_sample_data_files(files_hash, path=None, hash_type="sha256"):
     """Downloads sample data from a list of files
     Default download directory is the current working directory.
 
-    :Example:
+    Example Usage:
+        from autodataman.tools import *
+        download_sample_data_files("data_files.txt",path="demo_data",hash_type="md5")
 
-        .. doctest:: download_sample_data
-
-            >>> from autodataman.tools import *
-            >>> download_sample_data_files("data_files.txt",path="demo_data",hash_type="md5")
-
-    :param path: String of a valid filepath.
+    Arguments:
+    files_hash: Name of text file with hashes and file names. 
+            The first line of the file is the download root url.
+    path: String of a valid filepath or None.
         If None, sample data will be downloaded into the 
                 current working directory.
-    :type path: `str`_ or `None`_
-    :param hash_type: String of the hash type used in files_hash.
+    hash_type: String of the hash type used in files_hash.
                 Default is 'sha256'.
-    :type hash_type: `str`_
 
     This function was taken from the cdat_info package, with some updates.
     cdat_info Copyright (c) 2018, Lawrence Livermore National Security, LLC
