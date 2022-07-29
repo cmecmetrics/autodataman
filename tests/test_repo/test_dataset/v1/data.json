@@ -1,0 +1,15 @@
+{
+    "_DATA": {
+            "version": "v1",
+            "date": "1/1/11",
+            "source": "Test data source"
+    },
+    "_FILES": [
+                {
+                    "filename": "test_file_1.nc",
+                    "SHA256sum": "abcdefg123",
+                    "format": "netCDF",
+                    "on_download": ""
+            }
+    ]
+}
