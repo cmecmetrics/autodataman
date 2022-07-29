@@ -624,17 +624,17 @@ def test_adm_get_version(requests_mock,monkeypatch,setup_teardown_adm_get):
         requests_mock.get(strServer+"/"+strDataset+"/dataset.json",json=mock_dict)
 
         # mock test dataset using data from local repo
-        remote_data_path = strRemoteRepo +"/"+strDataset+"/" + strVersion + "/test_file_2.nc"
+        remote_data_path = strRemoteRepo +"/"+strDataset+"/" + strVersion + "/test_file_2.txt"
         with open(remote_data_path,"rb") as infile:
                 mock_data = infile.read()
-        mock_server_path = strServer+"/"+strDataset+"/" + strVersion + "/test_file_2.nc"
+        mock_server_path = strServer+"/"+strDataset+"/" + strVersion + "/test_file_2.txt"
         requests_mock.get(mock_server_path,content=mock_data)
 
         # Running adm_get with a dataet and version provided
         adm_get(strServer, strLocalRepo, strDataset+"/v1", fForceOverwrite, fVerbose)
 
         # Check that data file exists in destination repo
-        local_data_path = strLocalRepo +"/"+strDataset+"/" + strVersion + "/test_file_2.nc"
+        local_data_path = strLocalRepo +"/"+strDataset+"/" + strVersion + "/test_file_2.txt"
         assert os.path.exists(local_data_path)
 
         # Check that data.json exists in destination repo
@@ -688,17 +688,17 @@ def test_adm_get_dataset(requests_mock,monkeypatch,setup_teardown_adm_get):
         requests_mock.get(strServer+"/"+strDataset+"/dataset.json",json=mock_dict)
 
         # mock test dataset using data from local repo
-        remote_data_path = strRemoteRepo +"/"+strDataset+"/" + strVersion + "/test_file_2.nc"
+        remote_data_path = strRemoteRepo +"/"+strDataset+"/" + strVersion + "/test_file_2.txt"
         with open(remote_data_path,"rb") as infile:
                 mock_data = infile.read()
-        mock_server_path = strServer+"/"+strDataset+"/" + strVersion + "/test_file_2.nc"
+        mock_server_path = strServer+"/"+strDataset+"/" + strVersion + "/test_file_2.txt"
         requests_mock.get(mock_server_path,content=mock_data)
 
         # Running adm_get with a dataset only provided
         adm_get(strServer, strLocalRepo, strDataset, fForceOverwrite, fVerbose)
 
         # Check that data file exists in destination repo
-        local_data_path = strLocalRepo +"/"+strDataset+"/" + strVersion + "/test_file_2.nc"
+        local_data_path = strLocalRepo +"/"+strDataset+"/" + strVersion + "/test_file_2.txt"
         assert os.path.exists(local_data_path)
 
         # Check that data.json exists in destination repo
