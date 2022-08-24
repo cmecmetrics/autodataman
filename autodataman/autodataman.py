@@ -516,7 +516,7 @@ def adm_get(strServer, strLocalRepo, strDataset, fForceOverwrite, fVerbose):
         # Version exists in dataset
         else:
             # Load the local metadata file
-            admlocaldata.from_local_repo(strLocalRepo, strDatasetName, fVerbose)
+            admlocaldata.from_local_repo(strLocalRepo, strDatasetName, strDatasetVersion, fVerbose)
             
             # Check for equivalence
             if admserverdata == admlocaldata:
@@ -754,7 +754,7 @@ def main():
     parser_get.add_argument("dataset",help="dataset id",type=str)
     parser_get.add_argument("--server","-s",type=str,help="server")
     parser_get.add_argument("--local","-l",type=str,help="local repository")
-    parser_get.add_argument("--verbose","-v",help="increase verbosity")
+    parser_get.add_argument("--verbose","-v",help="increase verbosity",action="store_true")
     parser_get.add_argument("--force","-f",help="force overwrite",action="store_true")
 
     # TODO: validate
