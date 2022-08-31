@@ -95,7 +95,7 @@ repository_root
 
 ### Metadata files
 
-These JSON files contain basic information about the datasets being distributed. It is preferred that they use the .json extension. However, if you cannot share JSON files publicly for security reasons, you may use a ".txt" extension (using JSON syntax within the text file).
+These JSON files contain basic information about the datasets being distributed. It is preferred that they use the .json extension. However, if you cannot share JSON files, you may use a ".txt" extension (using JSON syntax within the text file). All metadata file extensions will be converted to .json in local repositories.
 
 repo.json   
 "_REPO": Values set by autodataman software. Key-value pairs are "type":"autodataman" and "version":"1".  
