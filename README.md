@@ -64,9 +64,94 @@ Give detailed information on the given dataset id.
 autodataman list [-v] [-l \<local repo dir\>]  
 List datasets available on the local data server.
 
-autodataman remove [-a] [-v] [-l \<local repo dir\>] \<dataset id\>[/version]  
+autodataman remove [-a] [-v] [-l \<local repo dir\>] \<datas#  id\>[/version]  
 Remove a dataset from the local data server.
 
 autodataman get [-f] [-v] [-l \<local repo dir\>]  [-s \<server\>] \<dataset id\>[/\<version\>]  
 Get the specified dataset from the remote data server and store it on the local data repo or remote server.
 
+## Setting up an autodataman repository
+
+Here is an example of the directory structure for an autodataman repository.   
+
+```
+repository_root
+| repo.json
+|
+|---- dataset 1
+|         | dataset.json
+|         |
+|         ----version 1
+|         |       | data.json
+|         |       | data.(nc,tar,txt,etc)
+|         |   
+|         ----version 2
+|                 | data.json
+|                 | data.(nc,tar,txt,etc)
+|
+|----dataset 2
+|       | ...
+```
+
+### Metadata files
+
+These JSON files contain basic information about the datasets being distributed. It is preferred that they use the .json extension. However, if you cannot share JSON files publicly for security reasons, you may use a ".txt" extension (using JSON syntax within the text file).
+
+repo.json   
+"_REPO": Values set by autodataman software. Key-value pairs are "type":"autodataman" and "version":"1".  
+"_DATASETS": A list of strings representing the names of datasets in the repository.  
+
+Example of repo.json:  
+```
+{
+    "_REPO": {
+        "type": "autodataman",
+        "version": "1"
+    },
+    "_DATASETS": [
+        "IBTrACS"
+    ]
+}
+```
+
+dataset.json  
+"_DATASET": Required keys are "short_name", "long_name", "source", and "default" (for default version).  
+"_VERSIONS": A list of strings representing the versions of this dataset present in the repository.  
+
+Example of dataset.json:  
+```
+{
+    "_DATASET": {
+        "short_name": "IBTrACS",
+        "long_name": "International Best Track Archive for Climate Stewardship (IBTrACS)",
+        "source": "",
+        "default": "v04r00"
+    },
+    "_VERSIONS": [
+        "v04r00"
+    ]
+}
+```
+
+data.json  
+"_DATA": Required keys are "version", "date", and "source".  
+"_FILES": A list of objects, where each object represents a file present in this version directory. The required keys in each object are "filename", "SHA256sum", and "format" (the file extension). An optional key is "on_download", containing commands that should be automatically executed on the file after download.  
+
+Example of data.json:  
+```
+{
+    "_DATA": {
+        "version": "v04r00",
+        "date": "2019-03-11",
+        "source": "https://www.ncdc.noaa.gov/ibtracs/index.php"
+    },
+    "_FILES": [
+        {
+            "filename": "IBTrACS.tgz",
+            "SHA256sum": "cfe1f7b113e1c77fa8c81c021f215f7234a8189ee45ef270569c72bb7eb76956",
+            "format": "tgz",
+            "on_download": "open"
+        }
+    ]
+}
+```
