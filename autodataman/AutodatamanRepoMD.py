@@ -186,6 +186,12 @@ class AutodatamanRepoDatasetMD:
         if not isinstance(jmeta["_DATASET"]["long_name"],str):
             raise SyntaxError("Malformed repository metadata value (\"_DATASET::long_name\" must be type \"string\")")
         self.m_strLongName = jmeta["_DATASET"]["long_name"]
+    
+        if "source" not in jmeta["_DATASET"]:
+            raise SyntaxError("Malformed repository metadata file (missing \"_DATASET::source\" key)")
+        if not isinstance(jmeta["_DATASET"]["source"],str):
+            raise SyntaxError("Malformed repository metadata value (\"_DATASET::source\" must be type \"string\")")
+        self.m_strSource = jmeta["_DATASET"]["source"]
 
         if "default" not in jmeta["_DATASET"]:
             raise SyntaxError("Malformed repository metadata file (missing \"_DATASET::default\" key)")
