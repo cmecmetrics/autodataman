@@ -115,7 +115,7 @@ def adm_initrepo(strDir):
     print("New autodataman repo \"{0}\" created successfully".format(strDir))
 
 def adm_setrepo(strDir):
-    pathRepo = Path(strDir)
+    pathRepo = Path(strDir).absolute()
 
     # Check for existence of repo path
     if not pathRepo.exists():
