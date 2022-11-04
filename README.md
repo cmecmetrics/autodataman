@@ -72,7 +72,7 @@ Get the specified dataset from the remote data server and store it on the local 
 
 ## Setting up an autodataman repository
 
-Here is an example of the directory structure for an autodataman repository.   
+Here is an example of the directory structure for an autodataman repository. This is considered a "Version 1" autodataman structure.  
 
 ```
 repository_root
