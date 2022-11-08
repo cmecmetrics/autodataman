@@ -4,13 +4,25 @@ The autodataman tool is intended to be a very lightweight climate data database 
 
 ## Install
 
+### Install from conda-forge (recommended)
+
+Create a new conda environment that installs "autodataman" from the conda-forge channel. For example:
+```
+conda create -n adm -c conda-forge autodataman
+```
+To create an environment with cmec-driver and autodataman:
+```
+conda create -n cmec -c conda-forge cmec_driver autodataman
+```
+
+### Install from "main" with pip
 Clone the autodataman repository.
 
 Enter the autodataman repository.
 
 With conda active, run the following commands to create a new autodataman environment:
 ```
-conda create -n adm -c conda-forge python=3.7 requests
+conda create -n adm -c conda-forge python=3.10 requests
 conda activate adm
 pip install .
 ```
