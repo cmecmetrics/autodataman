@@ -401,7 +401,7 @@ def adm_get(strServer, strLocalRepo, strDataset, fForceOverwrite, fVerbose):
     # Path to repo
     if len(strLocalRepo) < 2:
         raise Exception("Invalid local repository name {0}".format(strLocalRepo))
-    pathRepo = Path(strLocalRepo)
+    pathRepo = Path(strLocalRepo).absolute()
 
     # Path to dataset locally
     pathDataset = pathRepo / Path(strDatasetName)
@@ -610,6 +610,7 @@ def adm_get(strServer, strLocalRepo, strDataset, fForceOverwrite, fVerbose):
 
         # Load the namelist
         nml = AutodatamanNamelist()
+        nml.LoadFromUser()
 
         # Apply system commands
         fHasOnDownload = False
@@ -626,12 +627,12 @@ def adm_get(strServer, strLocalRepo, strDataset, fForceOverwrite, fVerbose):
                 
                 if nml[strNamelistVar] is not None:
                     strCommand = "cd " + str(pathVersionTemp) + " && " \
-                        + nml[strNamelistVar] + " " + str(pathFile) \
-                        + " && rm " + str(pathFile)
+                        + nml[strNamelistVar] + " " + str(pathFile.name) \
+                        + "&& rm " + str(pathFile.name)
                 
                     if strCommand != "" and strCommand is not None:
                         print("Executing \"{0}\"".format(strCommand))
-                        iResult = subprocess.run(strCommand) # TODO: check this run command
+                        iResult = subprocess.run(strCommand, shell=True) # TODO: check this run command
                         # TODO: wrap with try/except
 
         if fHasOnDownload:
