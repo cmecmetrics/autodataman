@@ -167,3 +167,7 @@ Example of data.json:
     ]
 }
 ```
+
+## License
+Autodataman is distributed under the terms of the BSD 3-Clause License.  
+LLNL-CODE-842430
