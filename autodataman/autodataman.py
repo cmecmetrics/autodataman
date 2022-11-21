@@ -27,7 +27,7 @@ class AutodatamanNamelist(Namelist.Namelist):
         return False
 
     def SetDefault(self): 
-        self["tgz_open_command"] = "tar -xzf"
+        self["tgz_open_command"] = "tar -xvf"
 
     def InitializePath(self):
         homedir = Path.home()
