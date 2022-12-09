@@ -5,7 +5,7 @@ packages=find_packages()
 
 setup(
     name='autodataman',
-    version='0.2',
+    version='0.5',
     description='Autodataman',
     long_description='The autodataman tool is intended to be a very lightweight climate data database and data distribution engine.',
     url='https://github.com/cmecmetrics/autodataman.git',
