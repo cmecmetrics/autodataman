@@ -4,17 +4,23 @@
 # Based on original code by Paul Ullrich
 # 
 
-from autodataman.AutodatamanRepoMD import AutodatamanRepoMD, AutodatamanRepoDatasetMD, AutodatamanRepoFileMD, AutodatamanRepoDataMD
-import autodataman.Namelist as Namelist
+import argparse
 import json
 import hashlib
+import os
 from pathlib import Path
+import signal
 import subprocess
 import shutil
-import argparse
 import sys
-import os
+
+from autodataman.AutodatamanRepoMD import AutodatamanRepoMD, AutodatamanRepoDatasetMD, AutodatamanRepoFileMD, AutodatamanRepoDataMD
+import autodataman.Namelist as Namelist
 import requests
+
+def signal_handler(sig, frame):
+    print("Cancelling...")
+    raise RuntimeError("User pressed ctrl-c")
 
 class AutodatamanNamelist(Namelist.Namelist):
     def __init__(self): 
@@ -383,6 +389,10 @@ def adm_remove(strLocalRepo,strDataset,fRemoveAll,fVerbose):
     print("Dataset {0} removed successfully".format(strDataset))
 
 def adm_get(strServer, strLocalRepo, strDataset, fForceOverwrite, fVerbose):
+
+    # Create signal hanlder for ctrl-c
+    signal.signal(signal.SIGINT, signal_handler)
+
     # Check arguments
     if len(strServer) == 0:
         raise RuntimeError("Missing server url")
@@ -642,7 +652,7 @@ def adm_get(strServer, strLocalRepo, strDataset, fForceOverwrite, fVerbose):
     # Cleanup if an exception occurs
     except Exception as e:
         if fNewDataset or fOverwriteVersion:
-            print("Exception caused code to abort.  Cleaning up.")
+            print("Exception caused code to abort. Cleaning up.")
         
         # Remove dataset directory created earlier in this function
         if fNewDataset:
@@ -657,8 +667,7 @@ def adm_get(strServer, strLocalRepo, strDataset, fForceOverwrite, fVerbose):
                 shutil.rmtree(str(pathVersionTemp))
 
         # Now throw the error
-        #print("Error: ",e)
-        raise Exception(e)
+        print("Error: ",e)
         return
 
     ########################################################################
@@ -687,8 +696,8 @@ def adm_get(strServer, strLocalRepo, strDataset, fForceOverwrite, fVerbose):
             ))
             admlocalrepo.to_file(str(pathRepoMetaJSON))
     except Exception as e:
-        # TODO: "validate" doesn't exist yet
         print("DANGER: Exception may have corrupted repository.")
+        # TODO: "validate" doesn't exist yet
         #print("        Run \"validate\" to check.")
         print("Error: ",e)
         return
